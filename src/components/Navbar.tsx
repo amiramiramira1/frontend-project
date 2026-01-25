@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/logo.jpeg';
 
 const navLinks = [
-  { name: 'Home', href: '#' },
-  { name: 'Boxes', href: '#boxes' },
-  { name: 'How It Works', href: '#how-it-works' },
-  { name: 'About', href: '#about' },
+  { name: 'Home', href: '/' },
+  { name: 'Boxes', href: '/boxes' },
+  { name: 'How It Works', href: '/#how-it-works' },
+  { name: 'About', href: '/#about' },
 ];
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [cartCount] = useState(3);
+  const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,24 +36,31 @@ const Navbar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <img src={logo} alt="Boxify" className="h-10 w-10 rounded-lg object-cover" />
             <span className="text-xl font-bold font-['Poppins'] text-foreground">
               Boxify
             </span>
-          </a>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-foreground/80 hover:text-primary font-medium transition-colors"
-              >
-                {link.name}
-              </a>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = link.href === '/' 
+                ? location.pathname === '/' 
+                : location.pathname.startsWith(link.href.replace('/#', '/'));
+              return (
+                <Link
+                  key={link.name}
+                  to={link.href}
+                  className={`font-medium transition-colors ${
+                    isActive ? 'text-primary' : 'text-foreground/80 hover:text-primary'
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Desktop Actions */}
@@ -100,14 +109,14 @@ const Navbar = () => {
           <div className="lg:hidden bg-card/95 backdrop-blur-md border-t border-border animate-fade-in">
             <div className="py-4 space-y-2">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.name}
-                  href={link.href}
+                  to={link.href}
                   className="block px-4 py-3 text-foreground/80 hover:text-primary hover:bg-accent/50 rounded-lg font-medium transition-colors"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {link.name}
-                </a>
+                </Link>
               ))}
               <div className="px-4 pt-4 border-t border-border flex gap-3">
                 <Button variant="outline" className="flex-1">
