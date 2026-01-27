@@ -65,20 +65,20 @@ const Navbar = () => {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-4">
-            <Button variant="ghost" size="sm">
-              Login
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/login">Login</Link>
             </Button>
-            <Button variant="default" size="sm">
-              Sign Up
+            <Button variant="default" size="sm" asChild>
+              <Link to="/signup">Sign Up</Link>
             </Button>
-            <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
+            <Link to="/dashboard" className="relative p-2 hover:bg-accent rounded-lg transition-colors">
               <ShoppingCart className="h-5 w-5 text-foreground" />
               {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-secondary text-secondary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
-            </button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -119,11 +119,11 @@ const Navbar = () => {
                 </Link>
               ))}
               <div className="px-4 pt-4 border-t border-border flex gap-3">
-                <Button variant="outline" className="flex-1">
-                  Login
+                <Button variant="outline" className="flex-1" asChild>
+                  <Link to="/login">Login</Link>
                 </Button>
-                <Button variant="default" className="flex-1">
-                  Sign Up
+                <Button variant="default" className="flex-1" asChild>
+                  <Link to="/signup">Sign Up</Link>
                 </Button>
               </div>
             </div>
