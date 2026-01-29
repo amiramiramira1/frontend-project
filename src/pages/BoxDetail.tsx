@@ -1,18 +1,27 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, ArrowLeft, ShoppingCart, Calendar, Flame, Beef, Wheat } from 'lucide-react';
+import { Star, ShoppingCart, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import MealCard from '@/components/MealCard';
+import ServingsSelector from '@/components/ServingsSelector';
+import BoxNutritionCard from '@/components/BoxNutritionCard';
+import BoxReviews from '@/components/BoxReviews';
 import { boxesData } from '@/data/boxesData';
 
 const BoxDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const box = boxesData.find((b) => b.slug === slug);
+  const [selectedServings, setSelectedServings] = useState(2);
 
   if (!box) {
     return (
@@ -30,25 +39,41 @@ const BoxDetail = () => {
     );
   }
 
+  // Convert USD to EGP (approximate rate for display)
+  const pricePerServing = Math.round(box.price * 3.8);
+  const basePrice = pricePerServing * box.mealsPerWeek * 2;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       
       <main className="pt-20">
         <div className="container mx-auto px-4 py-8 lg:py-12">
-          {/* Back Button */}
-          <Link
-            to="/boxes"
-            className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors mb-8"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Boxes
-          </Link>
+          {/* Breadcrumb */}
+          <Breadcrumb className="mb-8">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/">Home</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to="/boxes">Boxes</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{box.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
 
-          {/* Main Content */}
+          {/* TOP SECTION: 2-column layout */}
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-16">
             {/* Image */}
-            <div className="relative aspect-square rounded-2xl overflow-hidden">
+            <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl">
               <img
                 src={box.image}
                 alt={box.name}
@@ -61,7 +86,7 @@ const BoxDetail = () => {
               )}
             </div>
 
-            {/* Details */}
+            {/* Info */}
             <div className="flex flex-col">
               {/* Rating */}
               <div className="flex items-center gap-2 mb-4">
@@ -103,156 +128,71 @@ const BoxDetail = () => {
                 ))}
               </div>
 
-              {/* Price */}
+              {/* Starting Price */}
               <div className="mb-8">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-foreground">${box.price}</span>
-                  <span className="text-muted-foreground">/meal</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {box.mealsPerWeek} meals per week • ${(box.price * box.mealsPerWeek).toFixed(2)}/week
+                <p className="text-lg text-muted-foreground">
+                  Starting from{' '}
+                  <span className="text-2xl font-bold text-foreground">{basePrice} EGP</span>
+                  <span className="text-muted-foreground"> (for 2 people)</span>
                 </p>
               </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Button variant="cta" size="xl" className="flex-1">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Subscribe Weekly
-                </Button>
-                <Button variant="outline" size="xl" className="flex-1">
-                  <ShoppingCart className="h-5 w-5 mr-2" />
-                  One-Time Purchase
-                </Button>
-              </div>
-
-              {/* Nutrition Card */}
-              <Card className="bg-muted/50">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">Nutrition Info (per meal avg.)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-4 gap-4 text-center">
-                    <div>
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary/10 mx-auto mb-2">
-                        <Flame className="h-5 w-5 text-secondary" />
-                      </div>
-                      <p className="text-xl font-bold text-foreground">{box.nutrition.calories}</p>
-                      <p className="text-xs text-muted-foreground">Calories</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mx-auto mb-2">
-                        <Beef className="h-5 w-5 text-primary" />
-                      </div>
-                      <p className="text-xl font-bold text-foreground">{box.nutrition.protein}g</p>
-                      <p className="text-xs text-muted-foreground">Protein</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted mx-auto mb-2">
-                        <Wheat className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <p className="text-xl font-bold text-foreground">{box.nutrition.carbs}g</p>
-                      <p className="text-xs text-muted-foreground">Carbs</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted mx-auto mb-2">
-                        <div className="w-5 h-5 rounded-full bg-muted-foreground/60" />
-                      </div>
-                      <p className="text-xl font-bold text-foreground">{box.nutrition.fat}g</p>
-                      <p className="text-xs text-muted-foreground">Fat</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
 
-          {/* Tabs Section */}
-          <Tabs defaultValue="meals" className="mb-16">
-            <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-8">
-              <TabsTrigger
-                value="meals"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
-              >
-                Meals Included
-              </TabsTrigger>
-              <TabsTrigger
-                value="reviews"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
-              >
-                Customer Reviews
-              </TabsTrigger>
-            </TabsList>
+          {/* MEALS INCLUDED SECTION */}
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold text-foreground font-['Poppins'] mb-8">
+              {box.mealsPerWeek} Meals Included in This Box
+            </h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {box.meals.map((meal) => (
+                <MealCard key={meal.id} meal={meal} />
+              ))}
+            </div>
+          </section>
 
-            {/* Meals Tab */}
-            <TabsContent value="meals">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-                {box.meals.map((meal) => (
-                  <MealCard key={meal.id} meal={meal} />
-                ))}
-              </div>
-            </TabsContent>
+          {/* SERVINGS SELECTOR & CTA */}
+          <section className="mb-16">
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+              <ServingsSelector
+                mealsCount={box.mealsPerWeek}
+                pricePerServing={pricePerServing}
+                selectedServings={selectedServings}
+                onServingsChange={setSelectedServings}
+              />
 
-            {/* Reviews Tab */}
-            <TabsContent value="reviews">
-              <div className="max-w-3xl">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="flex items-center gap-2">
-                    <span className="text-4xl font-bold text-foreground">{box.rating}</span>
-                    <div className="flex flex-col">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < Math.floor(box.rating)
-                                ? 'fill-secondary text-secondary'
-                                : 'text-muted'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-muted-foreground">{box.reviews} reviews</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  {box.customerReviews.map((review) => (
-                    <div key={review.id}>
-                      <div className="flex items-start gap-4">
-                        <Avatar>
-                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                            {review.avatar}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
-                            <span className="font-semibold text-foreground">{review.name}</span>
-                            <span className="text-sm text-muted-foreground">{review.date}</span>
-                          </div>
-                          <div className="flex items-center gap-1 mb-2">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`h-3.5 w-3.5 ${
-                                  i < review.rating
-                                    ? 'fill-secondary text-secondary'
-                                    : 'text-muted'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <p className="text-muted-foreground">{review.comment}</p>
-                        </div>
-                      </div>
-                      <Separator className="mt-6" />
-                    </div>
-                  ))}
+              {/* CTA Buttons */}
+              <div className="flex flex-col justify-end">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button variant="cta" size="xl" className="flex-1">
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Add to Cart
+                  </Button>
+                  <Button variant="outline" size="xl" className="flex-1">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Subscribe Weekly
+                  </Button>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          </section>
+
+          {/* NUTRITION SUMMARY */}
+          <section className="mb-16 max-w-xl">
+            <BoxNutritionCard nutrition={box.nutrition} />
+          </section>
+
+          {/* CUSTOMER REVIEWS */}
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold text-foreground font-['Poppins'] mb-8">
+              Customer Reviews
+            </h2>
+            <BoxReviews
+              rating={box.rating}
+              reviewCount={box.reviews}
+              reviews={box.customerReviews}
+            />
+          </section>
         </div>
       </main>
 
