@@ -9,6 +9,8 @@ import BoxDetail from "./pages/BoxDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import SubscribeBox from "./pages/SubscribeBox";
+import ManageSubscription from "./pages/ManageSubscription";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import DashboardLayout from "./components/DashboardLayout";
@@ -34,6 +36,8 @@ const App = () => (
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order-confirmation" element={<OrderConfirmation />} />
+          <Route path="/subscribe/:slug" element={<SubscribeBox />} />
+          <Route path="/manage-subscription/:id" element={<ManageSubscription />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           
