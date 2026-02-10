@@ -1,0 +1,157 @@
+النظرة الشاملة أولاً (Big picture first)
+كمبتدئ، ستحتاج إلى فهم كيفية ترابط التطبيق ببعضه (how the app is wired) قبل الغوص في التفاصيل. أنصحك بهذا الترتيب:
+
+1. نقطة الدخول والتوجيه (Entry & routing)
+src/main.tsx
+
+شاهد كيف يتم عمل Mounting لـ React وأين يتم رندر (render) مكون <App />.
+
+src/App.tsx
+
+افهم استخدام:
+
+BrowserRouter, Routes, Route
+
+ما هي المسارات (paths) الموجودة (مثل /, /boxes, /cart, إلخ).
+
+الهدف: "عندما أكتب /something في المتصفح، أي Component سيظهر؟"
+
+2. التخطيط والتنقل (Layout & navigation)
+src/components/Navbar.tsx
+
+اطلع على الروابط (<Link> من react-router-dom) وسلوك أيقونة السلة (cart icon).
+
+لاحظ الفرق في الـ Rendering بين نسخة الـ Desktop والـ Mobile.
+
+src/components/Footer.tsx
+
+Layout بسيط مشترك يظهر في أسفل الصفحات.
+
+src/components/DashboardLayout.tsx + components/admin/AdminLayout.tsx
+
+افهم كيف تقوم قوالب الـ Dashboard والـ Admin باحتواء الصفحات الداخلية عبر استخدام <Outlet />.
+
+3. الصفحات الأساسية (Core pages - Public site)
+src/pages/Index.tsx
+
+نقطة الدخول للصفحة الرئيسية، وما هي الأقسام (sections) التي تقوم بعمل render لها:
+
+Hero, HowItWorks, FeaturedBoxes, Testimonials.
+
+src/components/Hero.tsx
+
+كيف يتم بناء "قسم الـ Hero" (صورة الخلفية، العنوان، الأزرار، واستخدام Tailwind classes).
+
+src/components/HowItWorks.tsx, FeaturedBoxes.tsx, Testimonials.tsx
+
+أمثلة على Presentational components تعتمد على بيانات ثابتة (static) أو مشتركة.
+
+src/pages/BrowseBoxes.tsx
+
+أول صفحة تعتمد على الحالة (Stateful page):
+
+استخدام useState للفلاتر (filters).
+
+عمل Iterating على البيانات لعرض الكروت (cards).
+
+استخدام مكونات الـ UI مثل (Card, Button, Checkbox).
+
+src/pages/BoxDetail.tsx
+
+استخدام پارامترات المسار (useParams).
+
+إيجاد العنصر الصحيح من البيانات.
+
+تمرير الـ Props إلى المكونات الفرعية مثل MealCard و BoxNutritionCard.
+
+4. البيانات المشتركة والقطع القابلة لإعادة الاستخدام (Shared data & reusable pieces)
+src/data/boxesData.ts
+
+افهم هيكل البيانات (shape of data) الذي بني عليه الموقع بالكامل.
+
+شاهد كيف تم تنظيم الـ boxes، الـ meals، الـ nutrition، والـ reviews.
+
+src/components/MealCard.tsx
+
+مثال جيد على:
+
+تحديد هيكل البيانات (MealData).
+
+استخدام الـ Props.
+
+التنسيق الشرطي (Conditional styling) بناءً على العلامات (tags).
+
+مكونات أخرى معاد استخدامها (إلقاء نظرة سريعة):
+
+src/components/BoxNutritionCard.tsx
+
+src/components/BoxReviews.tsx
+
+src/components/ServingsSelector.tsx
+
+ركز على: كيف تتدفق الـ Props من الصفحات (Pages) إلى المكونات (Components).
+
+5. تدفق السلة والدفع (Cart & checkout flow)
+src/pages/Cart.tsx
+
+استخدام useState لمصفوفة العناصر (array of items).
+
+الوظائف (functions) التي تحدّث الحالة: updateQuantity, removeItem.
+
+القيم المشتقة (Derived values): مثل subtotal و total.
+
+الرندر الشرطي (Empty vs non-empty cart).
+
+src/pages/Checkout.tsx
+
+تدفق متعدد الخطوات (Multi-step flow) باستخدام حالة currentStep.
+
+تمرير الـ Props لمكونات الأبناء مثل DeliveryAddressForm و PaymentMethodForm.
+
+محاكاة العمليات غير المتزامنة (Async work) باستخدام setTimeout أو await.
+
+src/pages/OrderConfirmation.tsx
+
+مثال على صفحة غنية بالعناصر لكنها Presentational غالباً، تستخدم بيانات وهمية (mock data).
+
+6. لوحة التحكم (Dashboard - منطقة تسجيل الدخول)
+src/pages/Dashboard.tsx
+
+كيفية هيكلة لوحة التحكم: كروت الإحصائيات (stats cards)، الطلبات الأخيرة، والتوصيلات القادمة.
+
+src/pages/OrderHistory.tsx
+
+تنسيق الجداول (Table layout)، الصفوف القابلة للتوسيع، واستخدام useState للعنصر المفتوح حالياً.
+
+7. منطقة الإدارة (Admin area)
+src/components/admin/AdminLayout.tsx
+
+مشابه لـ DashboardLayout ولكن للمسار /admin.
+
+صفحات الإدارة:
+
+اطلع على كيفية بناء واجهات الـ CRUD (جداول، نماذج Forms، فلاتر) في صفحات مثل AdminBoxes.tsx و AdminBoxForm.tsx.
+
+8. الأدوات المساعدة ومكتبة الواجهة (Utilities & UI library)
+src/lib/utils.ts
+
+مساعد cn (لدمج الـ class names) المستخدم في كل أرجاء التطبيق.
+
+مكونات shadcn-ui في src/components/ui/:
+
+ابدأ بالبسيط منها: button.tsx, card.tsx, input.tsx.
+
+الهدف: رؤية كيف تُعرّف مكونات الـ UI القابلة لإعادة الاستخدام وكيف تُستخدم في الصفحات.
+
+كيف تدرس كل ملف (How to study each file)
+لكل ملف تفتحه، حاول الإجابة على:
+
+ما هي الـ Props التي يستقبلها هذا المكون؟
+
+ما هي الـ State التي يديرها باستخدام useState؟
+
+ما هي الـ Derived values (القيم المشتقة) التي يحسبها من الـ State أو الـ Props؟
+
+ما هي الأحداث (Events) مثل onClick التي تغير الحالة؟
+
+كيف يستخدم التوجيه (Routing) مثل Link أو useNavigate؟

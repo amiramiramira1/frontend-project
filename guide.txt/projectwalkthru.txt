@@ -1,0 +1,146 @@
+### Big picture first
+
+As a beginner, you want to **understand how the app is wired** before diving into details. I’d go in this order:
+
+---
+
+### 1. Entry & routing (how the app starts)
+
+1. **`src/main.tsx`**
+   - See how React is mounted and where `<App />` is rendered.
+2. **`src/App.tsx`**
+   - Understand:
+     - `BrowserRouter`, `Routes`, `Route`
+     - What paths exist (`/`, `/boxes`, `/box/:slug`, `/cart`, `/checkout`, `/dashboard`, `/admin`, etc.).
+   - Goal: “When I type `/something`, which component shows up?”
+
+---
+
+### 2. Layout & navigation
+
+3. **`src/components/Navbar.tsx`**
+   - See links (`<Link>` from `react-router-dom`) and the cart icon behavior.
+   - Notice desktop vs mobile rendering.
+
+4. **`src/components/Footer.tsx`**
+   - Simple shared layout at the bottom of pages.
+
+5. **`src/components/DashboardLayout.tsx` + `components/admin/AdminLayout.tsx`**
+   - See how dashboard/admin layouts wrap their inner pages via `<Outlet />`.
+
+---
+
+### 3. Core pages (public site)
+
+6. **`src/pages/Index.tsx`**
+   - Entry point for the home page, which sections it renders:
+     - `Hero`, `HowItWorks`, `FeaturedBoxes`, `Testimonials`.
+
+7. **`src/components/Hero.tsx`**
+   - How a “hero section” is built (background image, headline, buttons, Tailwind classes).
+
+8. **`src/components/HowItWorks.tsx`, `FeaturedBoxes.tsx`, `Testimonials.tsx`**
+   - Examples of presentational components powered by static or shared data.
+
+9. **`src/pages/BrowseBoxes.tsx`**
+   - First **stateful** page:
+     - `useState` for filters
+     - Iterating over data to show cards
+     - Using UI components (`Card`, `Button`, `Checkbox`, `RadioGroup`).
+
+10. **`src/pages/BoxDetail.tsx`**
+    - Using route params (`useParams`)
+    - Finding the right item from data
+    - Passing props down to components like `MealCard`, `BoxNutritionCard`.
+
+---
+
+### 4. Shared data & reusable pieces
+
+11. **`src/data/boxesData.ts`**
+    - Understand the **shape of data** the site is built around.
+    - See how boxes, meals, nutrition, reviews are structured.
+
+12. **`src/components/MealCard.tsx`**
+    - Good example of:
+      - Defining a data shape (`MealData`)
+      - Using props
+      - Conditional styling based on tags.
+
+13. **Other reused components** (skim):
+    - `src/components/BoxNutritionCard.tsx`
+    - `src/components/BoxReviews.tsx`
+    - `src/components/ServingsSelector.tsx`
+
+Focus on **how props flow** from pages → components.
+
+---
+
+### 5. Cart & checkout flow
+
+14. **`src/pages/Cart.tsx`**
+    - `useState` for an array of items.
+    - Functions that update state:
+      - `updateQuantity`, `updateServings`, `removeItem`.
+    - Derived values:
+      - `subtotal`, `deliveryFee`, `total`.
+    - Conditional rendering (empty vs non-empty cart).
+
+15. **`src/pages/Checkout.tsx`**
+    - Multi-step flow with a `currentStep` state.
+    - Passing props to child components (`DeliveryAddressForm`, `PaymentMethodForm`, `OrderReviewStep`).
+    - Simulating async work with `setTimeout` / `await`.
+
+16. **`src/pages/OrderConfirmation.tsx`**
+    - Example of a rich, mostly presentational page using mock data and some derived values.
+
+---
+
+### 6. Dashboard (logged-in area)
+
+17. **`src/pages/Dashboard.tsx`**
+    - How to structure a dashboard: stats cards, recent orders, upcoming deliveries.
+18. **`src/pages/OrderHistory.tsx`**
+    - Table layout, expandable rows, `useState` for currently expanded item.
+
+Then briefly skim:
+
+- `src/pages/Subscriptions.tsx`
+- `src/pages/Profile.tsx`
+- `src/pages/Settings.tsx`
+
+Just to see consistent patterns.
+
+---
+
+### 7. Admin area
+
+19. **`src/components/admin/AdminLayout.tsx`**
+    - Similar to `DashboardLayout`, but for `/admin`.
+
+20. **`src/pages/admin/AdminDashboard.tsx`, `AdminBoxes.tsx`, `AdminBoxForm.tsx`, `AdminIngredients.tsx`**
+    - See how CRUD-like admin UIs are scaffolded (tables, forms, filters).
+
+---
+
+### 8. Utilities & UI library
+
+21. **`src/lib/utils.ts`**
+    - `cn` helper (class name merging) used across the app.
+
+22. **A couple of shadcn-ui components** in `src/components/ui/`:
+    - Start with simple ones: `button.tsx`, `card.tsx`, `input.tsx`.
+    - Goal: see how reusable UI components are defined and then used across pages.
+
+---
+
+### How to study each file
+
+For each file you open, try to answer:
+
+- **What props does this component receive?**
+- **What state does it manage with `useState`?**
+- **What derived values does it compute from state/props?**
+- **What events (`onClick`, `onChange`, etc.) change the state?**
+- **How does it use routing (`Link`, `useParams`, `useNavigate`)?**
+
