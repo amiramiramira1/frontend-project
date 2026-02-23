@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import api from '../api/axios';
+import { sampleBoxes } from '../data/mockData';
 import BoxCard from '../components/BoxCard';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 
@@ -13,19 +13,23 @@ export default function BoxesPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'All');
 
-  const fetchBoxes = async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (search) params.set('search', search);
-      if (selectedCategory !== 'All') params.set('category', selectedCategory);
-      const { data } = await api.get(`/boxes?${params}`);
-      setBoxes(data);
-    } catch {} 
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { fetchBoxes(); }, [selectedCategory, search]);
+    // Simulate a small delay for realistic feel
+    const timer = setTimeout(() => {
+      let filtered = sampleBoxes;
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(b => b.name.toLowerCase().includes(q) || b.description.toLowerCase().includes(q));
+      }
+      if (selectedCategory !== 'All') {
+        filtered = filtered.filter(b => b.category === selectedCategory);
+      }
+      setBoxes(filtered);
+      setLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [selectedCategory, search]);
 
   return (
     <div className="min-h-screen bg-gray-50">

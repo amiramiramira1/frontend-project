@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
 
@@ -27,14 +26,20 @@ export default function CheckoutPage() {
     }
     setSubmitting(true);
     try {
-      const { data } = await api.post('/orders/create', {
-        deliveryAddress: form,
-        paymentMethod: 'cash_on_delivery'
-      });
+      // Mock order creation
+      await new Promise(r => setTimeout(r, 600));
+      const mockOrder = {
+        _id: 'order-' + Date.now(),
+        orderNumber: 'BX-' + Math.floor(100000 + Math.random() * 900000),
+        totalPrice: cart.cartTotal,
+        deliveryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+        paymentMethod: 'cash_on_delivery',
+        status: 'pending',
+      };
       await clearCart();
-      navigate('/order-confirmation', { state: { order: data } });
+      navigate('/order-confirmation', { state: { order: mockOrder } });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Order failed');
+      toast.error('Order failed');
     } finally {
       setSubmitting(false);
     }

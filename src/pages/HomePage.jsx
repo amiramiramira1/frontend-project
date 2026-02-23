@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Clock, Users, Leaf, Star, ChevronRight, Package, Truck, Shield } from 'lucide-react';
 import BoxCard from '../components/BoxCard';
 import { useEffect, useState } from 'react';
-import api from '../api/axios';
+import { sampleBoxes } from '../data/mockData';
 
 const features = [
   { icon: Clock, title: 'Save Time', desc: 'Pre-portioned ingredients, no meal planning or grocery shopping needed.' },
@@ -23,10 +23,10 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/boxes?featured=true')
-      .then(({ data }) => setFeaturedBoxes(data.slice(0, 3)))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    setTimeout(() => {
+      setFeaturedBoxes(sampleBoxes.filter(b => b.featured).slice(0, 3));
+      setLoading(false);
+    }, 300);
   }, []);
 
   return (

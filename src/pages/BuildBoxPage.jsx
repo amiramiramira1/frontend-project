@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import { sampleMeals, calculateCustomBoxPrice } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
@@ -25,25 +25,19 @@ export default function BuildBoxPage() {
   const [boxName, setBoxName] = useState('My Custom Box');
 
   useEffect(() => {
-    api.get('/meals').then(({ data }) => setMeals(data)).finally(() => setLoading(false));
+    setTimeout(() => { setMeals(sampleMeals); setLoading(false); }, 300);
   }, []);
 
   useEffect(() => {
     if (selected.length === 0) { setPriceInfo(null); return; }
-    const timer = setTimeout(calculatePrice, 400);
+    const timer = setTimeout(() => {
+      setCalculating(true);
+      const result = calculateCustomBoxPrice(selected, servings);
+      setPriceInfo(result);
+      setCalculating(false);
+    }, 200);
     return () => clearTimeout(timer);
   }, [selected, servings]);
-
-  const calculatePrice = async () => {
-    setCalculating(true);
-    try {
-      const { data } = await api.post('/custom-box/calculate', {
-        mealIds: selected,
-        servingsPerMeal: servings
-      });
-      setPriceInfo(data);
-    } catch {} finally { setCalculating(false); }
-  };
 
   const toggle = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);

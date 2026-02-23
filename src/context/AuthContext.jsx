@@ -1,5 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api/axios';
+import { createContext, useContext, useState } from 'react';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext(null);
@@ -14,14 +13,21 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      localStorage.setItem('boxify_token', data.token);
-      localStorage.setItem('boxify_user', JSON.stringify(data));
-      setUser(data);
-      toast.success(`Welcome back, ${data.name}!`);
-      return data;
+      // Mock login — accepts any credentials
+      const mockUser = {
+        _id: 'mock-user-001',
+        name: email.split('@')[0] || 'Demo User',
+        email,
+        role: email.includes('admin') ? 'admin' : 'user',
+        token: 'mock-jwt-token-' + Date.now(),
+      };
+      localStorage.setItem('boxify_token', mockUser.token);
+      localStorage.setItem('boxify_user', JSON.stringify(mockUser));
+      setUser(mockUser);
+      toast.success(`Welcome back, ${mockUser.name}!`);
+      return mockUser;
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      toast.error('Login failed');
       throw err;
     } finally {
       setLoading(false);
@@ -31,14 +37,21 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/register', { name, email, password });
-      localStorage.setItem('boxify_token', data.token);
-      localStorage.setItem('boxify_user', JSON.stringify(data));
-      setUser(data);
-      toast.success(`Welcome to Boxify, ${data.name}!`);
-      return data;
+      // Mock register — creates user locally
+      const mockUser = {
+        _id: 'mock-user-' + Date.now(),
+        name,
+        email,
+        role: 'user',
+        token: 'mock-jwt-token-' + Date.now(),
+      };
+      localStorage.setItem('boxify_token', mockUser.token);
+      localStorage.setItem('boxify_user', JSON.stringify(mockUser));
+      setUser(mockUser);
+      toast.success(`Welcome to Boxify, ${mockUser.name}!`);
+      return mockUser;
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed');
+      toast.error('Registration failed');
       throw err;
     } finally {
       setLoading(false);
@@ -53,11 +66,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshUser = async () => {
-    try {
-      const { data } = await api.get('/auth/me');
-      setUser(prev => ({ ...prev, ...data }));
-      localStorage.setItem('boxify_user', JSON.stringify({ ...user, ...data }));
-    } catch {}
+    // No-op in mock mode
   };
 
   return (

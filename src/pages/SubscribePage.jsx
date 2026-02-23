@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Calendar, Repeat, Users, CheckCircle } from 'lucide-react';
@@ -30,22 +29,12 @@ export default function SubscribePage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = {
-        boxType: type === 'pre-made' ? 'pre-made' : 'custom',
-        frequency: form.frequency,
-        deliveryDay: form.deliveryDay,
-        servingsPerMeal: servings,
-      };
-      if (type === 'pre-made') payload.boxId = boxId;
-      else {
-        payload.mealPool = mealIds.map(id => ({ mealId: id }));
-        payload.customBox = { name };
-      }
-      const { data } = await api.post('/subscriptions', payload);
+      // Mock subscription — just simulate success
+      await new Promise(r => setTimeout(r, 500));
       toast.success('Subscription created! First order generated.');
       navigate('/dashboard/subscriptions');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to subscribe');
+      toast.error('Failed to subscribe');
     } finally {
       setLoading(false);
     }

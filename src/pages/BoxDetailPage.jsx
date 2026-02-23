@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import api from '../api/axios';
+import { sampleBoxes } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
@@ -32,10 +32,12 @@ export default function BoxDetailPage() {
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    api.get(`/boxes/${id}`)
-      .then(({ data }) => setBox(data))
-      .catch(() => navigate('/boxes'))
-      .finally(() => setLoading(false));
+    setTimeout(() => {
+      const found = sampleBoxes.find(b => b._id === id);
+      if (found) setBox(found);
+      else navigate('/boxes');
+      setLoading(false);
+    }, 200);
   }, [id]);
 
   const currentPricing = box?.pricingOptions?.[servings];
