@@ -24,6 +24,9 @@ export default function CheckoutPage() {
     if (!form.street || !form.city || !form.phone) {
       toast.error('Please fill all required fields'); return;
     }
+    if (form.phone.value != Number || form.zip.value != Number) {
+      toast.error('Please ensure either Phone Number or ZIP code are in numbers.'); return;
+    }
     setSubmitting(true);
     try {
       // Mock order creation
