@@ -4,11 +4,13 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
+import { useRef } from 'react';
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const orderPlaced = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     street: user?.addresses?.[0]?.street || '',
@@ -50,6 +52,7 @@ export default function CheckoutPage() {
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
       };
+      orderPlaced.current = true;
       await clearCart();
       navigate('/order-confirmation', { state: { order: mockOrder } });
     } catch (err) {
@@ -58,8 +61,8 @@ export default function CheckoutPage() {
       setSubmitting(false);
     }
   };
-
-  if (!cart.items?.length) {
+  
+  if (!cart.items?.length && !orderPlaced.current){
     navigate('/cart'); return null;
   }
 
