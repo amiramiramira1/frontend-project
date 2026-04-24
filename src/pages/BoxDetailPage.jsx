@@ -106,12 +106,12 @@ export default function BoxDetailPage() {
             {/* Meals */}
             <div>
               <h2 className="font-display text-2xl font-bold mb-4">What's Included</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 {box.pricingOptions?.[servings]?.mealDetails?.map((meal) => (
                   <div key={meal._id} className="card p-4 flex gap-4">
                     <img src={meal.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'} alt={meal.name} className="w-20 h-20 rounded-xl object-cover flex-shrink-0" />
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{meal.name}</h3>
+                      <h3 className="font-semibold text-gray-900 line-clamp-2">{meal.name}</h3>
                       <p className="text-xs text-gray-400 mt-0.5 mb-2 line-clamp-2">{meal.description}</p>
                       <div className="flex gap-3 text-xs text-gray-500">
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {meal.prepTime}m</span>
