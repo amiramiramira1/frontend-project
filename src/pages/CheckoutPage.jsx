@@ -36,6 +36,8 @@ export default function CheckoutPage() {
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
       };
+      const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+      localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));
       await clearCart();
       navigate('/order-confirmation', { state: { order: mockOrder } });
     } catch (err) {
