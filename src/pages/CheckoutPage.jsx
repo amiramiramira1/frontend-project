@@ -4,11 +4,13 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
+import { useRef } from 'react';
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const orderPlaced = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     street: user?.addresses?.[0]?.street || '',
@@ -35,9 +37,16 @@ export default function CheckoutPage() {
         deliveryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
+        createdAt: new Date().toISOString(),
       };
-      await clearCart();
+      const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+      localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));
+
+      orderPlaced.current = true;
       navigate('/order-confirmation', { state: { order: mockOrder } });
+
+      try { await clearCart(); } catch (_) {}
+
     } catch (err) {
       toast.error('Order failed');
     } finally {
