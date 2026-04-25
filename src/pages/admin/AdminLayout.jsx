@@ -165,17 +165,17 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gray-900 text-white">
         <div className="page-container">
-          <div className="flex flex-row items-center gap-3 py-4">
+          <div className="flex flex-row items-center gap-3 py-7">
             <div className="w-9 h-9 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
               <LayoutDashboard className="w-5 h-5 text-white" />
             </div>
-            <h1 className="font-display text-sm font-bold leading-tight">
+            <h1 className="font-display text-base font-bold leading-tight">
   Boxify <br /> Admin
 </h1>
             <nav className="ml-2 flex gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden">
               {adminNav.map(({ to, label, icon: Icon, end }) => (
                 <NavLink key={to} to={to} end={end} className={({ isActive }) =>
-                  `flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`
+                  `flex items-center gap-2 px-2 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10'}`
                 }>
                   <Icon className="w-4 h-4" /> {label}
                 </NavLink>
