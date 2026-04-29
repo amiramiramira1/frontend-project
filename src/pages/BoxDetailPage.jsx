@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { sampleBoxes } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -75,6 +76,19 @@ export default function BoxDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Helmet>
+        <title>{box ? `${box.name} — Boxify` : 'Boxify'}</title>
+        <meta name="description" content={box?.description || ''} />
+        <link rel="canonical" href={`https://boxify.com/boxes/${box?._id}`} />
+        <meta property="og:title" content={box ? `${box.name} — Boxify` : 'Boxify'} />
+        <meta property="og:description" content={box?.description || ''} />
+        <meta property="og:image" content={box?.image || ''} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={box ? `${box.name} — Boxify` : 'Boxify'} />
+        <meta name="twitter:description" content={box?.description || ''} />
+        <meta name="twitter:image" content={box?.image || ''} />
+      </Helmet>
+
       {/* Header Image */}
       <div className="relative h-72 md:h-96">
         <img src={box.image || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=1200'} alt={box.name} className="w-full h-full object-cover" />
@@ -106,12 +120,12 @@ export default function BoxDetailPage() {
             {/* Meals */}
             <div>
               <h2 className="font-display text-2xl font-bold mb-4">What's Included</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 {box.pricingOptions?.[servings]?.mealDetails?.map((meal) => (
                   <div key={meal._id} className="card p-4 flex gap-4">
                     <img src={meal.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'} alt={meal.name} className="w-20 h-20 rounded-xl object-cover flex-shrink-0" />
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{meal.name}</h3>
+                      <h3 className="font-semibold text-gray-900 line-clamp-2">{meal.name}</h3>
                       <p className="text-xs text-gray-400 mt-0.5 mb-2 line-clamp-2">{meal.description}</p>
                       <div className="flex gap-3 text-xs text-gray-500">
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {meal.prepTime}m</span>
