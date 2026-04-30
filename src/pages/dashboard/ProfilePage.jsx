@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState , useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { User, MapPin, Plus, Trash2, Save } from 'lucide-react';
+import { User, MapPin, Plus, Trash2, Save, Settings } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -12,11 +12,30 @@ export default function ProfilePage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAddr, setNewAddr] = useState({ label: 'Home', street: '', city: 'Cairo', zip: '', phone: '', isDefault: false });
 
+  const [preferences, setPreferences] = useState(() => {
+  const saved = localStorage.getItem('boxify_preferences');
+  return saved
+    ? JSON.parse(saved)
+    : {
+        emailNotifications: true,
+        language: 'English',
+        servingSize: '2',
+      };
+});
+
+    useEffect(() => {
+    if (user) {
+    setName(user.name || '');
+    setAddresses(user.addresses || []);
+        }
+    }, [user]);
+
   const saveProfile = async () => {
     setSaving(true);
     try {
       await api.put('/auth/profile', { name, addresses });
       await refreshUser();
+      localStorage.setItem('boxify_preferences', JSON.stringify(preferences));
       toast.success('Profile updated!');
     } catch { toast.error('Failed to save'); }
     finally { setSaving(false); }
@@ -26,6 +45,7 @@ export default function ProfilePage() {
     if (!newAddr.street || !newAddr.phone) { toast.error('Street and phone required'); return; }
     setAddresses(prev => [...prev, { ...newAddr, _id: Date.now().toString() }]);
     setNewAddr({ label: 'Home', street: '', city: 'Cairo', zip: '', phone: '', isDefault: false });
+
     setShowAddForm(false);
     toast.success('Address added — save your profile to keep it');
   };
@@ -88,6 +108,72 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Settings */}
+    <div className="card p-6">
+      <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
+    <Settings className="w-5 h-5 text-brand-500" /> User Settings
+      </h3>
+
+    <div className="space-y-4">
+    {/* Email Notifications */}
+    <label className="flex items-center justify-between">
+      <span className="text-gray-700 font-medium">Email Notifications</span>
+      <input
+        type="checkbox"
+        checked={preferences.emailNotifications}
+        onChange={e =>
+          setPreferences(prev => ({
+            ...prev,
+            emailNotifications: e.target.checked,
+          }))
+        }
+        className="w-4 h-4"
+      />
+     </label>
+
+    {/* Language */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        Preferred Language
+      </label>
+      <select
+        value={preferences.language}
+        onChange={e =>
+          setPreferences(prev => ({
+            ...prev,
+            language: e.target.value,
+          }))
+        }
+        className="input-field"
+      >
+        <option value="English">English</option>
+        <option value="Arabic">Arabic</option>
+      </select>
+    </div>
+
+    {/* Serving Size */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        Default Serving Size
+      </label>
+      <select
+        value={preferences.servingSize}
+        onChange={e =>
+          setPreferences(prev => ({
+            ...prev,
+            servingSize: e.target.value,
+          }))
+        }
+        className="input-field"
+      >
+        <option value="2">2 Servings</option>
+        <option value="4">4 Servings</option>
+        <option value="6">6 Servings</option>
+      </select>
+    </div>
+  </div>
+</div>
 
       <button onClick={saveProfile} disabled={saving} className="btn-primary flex items-center gap-2">
         <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Changes'}
