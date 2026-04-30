@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Menu, X, Package, ChefHat, User, LogOut, Settings, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, Menu, X, Package, ChefHat, User, LogOut, Settings, LayoutDashboard, Heart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
   const { itemCount } = useCart();
+  const { favoritesCount } = useFavorites();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -62,14 +64,27 @@ export default function Navbar() {
           {/* Right side */}
           <div className="flex items-center gap-3">
             {user && (
-              <Link to="/cart" className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors">
-                <ShoppingCart className="w-5 h-5 text-gray-700" />
-                {itemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                    {itemCount}
-                  </span>
-                )}
-              </Link>
+              <>
+                {/* ✅ Favorites Badge */}
+                <Link to="/boxes?favorites=true" className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  <Heart className="w-5 h-5 text-gray-700" />
+                  {favoritesCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                      {favoritesCount}
+                    </span>
+                  )}
+                </Link>
+
+                {/* Cart Badge */}
+                <Link to="/cart" className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  <ShoppingCart className="w-5 h-5 text-gray-700" />
+                  {itemCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                      {itemCount}
+                    </span>
+                  )}
+                </Link>
+              </>
             )}
 
             {user ? (
@@ -143,7 +158,6 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Click outside to close user menu */}
       {userMenuOpen && <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />}
     </nav>
   );

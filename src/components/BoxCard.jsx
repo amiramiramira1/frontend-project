@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
-import { Clock, Users, ChefHat, ArrowRight, Zap } from 'lucide-react';
+import { Clock, Users, ChefHat, ArrowRight, Heart } from 'lucide-react';
+import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const dietTags = {
   'vegetarian': { color: 'bg-green-100 text-green-700', label: '🌱 Vegetarian' },
@@ -11,6 +14,19 @@ const dietTags = {
 
 export default function BoxCard({ box }) {
   const displayPrice = box.startingPrice || 0;
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const { user } = useAuth();
+  const favorited = isFavorite(box._id);
+
+  const handleFavorite = (e) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error('Please log in to save favorites');
+      return;
+    }
+    toggleFavorite(box._id);
+    toast.success(favorited ? 'Removed from favorites' : 'Added to favorites! ❤️');
+  };
 
   return (
     <div className="card group overflow-hidden hover:-translate-y-1 transition-all duration-300">
@@ -26,9 +42,20 @@ export default function BoxCard({ box }) {
             <span className="badge bg-brand-500 text-white">⭐ Featured</span>
           </div>
         )}
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 flex items-center gap-2">
           <span className="badge bg-white/90 text-gray-700 backdrop-blur-sm">{box.category}</span>
         </div>
+        {/* ✅ Heart Button */}
+        <button
+          onClick={handleFavorite}
+          className={`absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
+            favorited
+              ? 'bg-red-500 text-white scale-110'
+              : 'bg-white/90 text-gray-400 hover:text-red-500 hover:scale-110'
+          }`}
+        >
+          <Heart className={`w-4 h-4 ${favorited ? 'fill-white' : ''}`} />
+        </button>
       </div>
 
       {/* Content */}

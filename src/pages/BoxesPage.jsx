@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { sampleBoxes } from '../data/mockData';
 import BoxCard from '../components/BoxCard';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { Search, Heart } from 'lucide-react';
+import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const categories = ['All', 'Mediterranean', 'Egyptian', 'Healthy', 'Italian', 'Vegetarian', 'High-Protein'];
 
@@ -12,6 +15,10 @@ export default function BoxesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'All');
+  const [showFavorites, setShowFavorites] = useState(
+  searchParams.get('favorites') === 'true');
+  const { favorites } = useFavorites();
+  const { user } = useAuth();
 
   useEffect(() => {
     setLoading(true);
@@ -25,11 +32,22 @@ export default function BoxesPage() {
       if (selectedCategory !== 'All') {
         filtered = filtered.filter(b => b.category === selectedCategory);
       }
+      if (showFavorites) {
+        filtered = filtered.filter(b => favorites.includes(b._id));
+      }
       setBoxes(filtered);
       setLoading(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [selectedCategory, search]);
+  }, [selectedCategory, search, showFavorites, favorites]);
+
+  const handleFavoritesFilter = () => {
+    if (!user) {
+      toast.error('Please log in to view favorites');
+      return;
+    }
+    setShowFavorites(prev => !prev);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -54,14 +72,14 @@ export default function BoxesPage() {
               className="input-field pl-11"
             />
           </div>
-          {/* Category Pills */}
+          {/* Category Pills + Favorites */}
           <div className="flex gap-2 flex-wrap">
             {categories.map(cat => (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => { setSelectedCategory(cat); setShowFavorites(false); }}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  selectedCategory === cat
+                  selectedCategory === cat && !showFavorites
                     ? 'bg-brand-500 text-white shadow-md'
                     : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-300'
                 }`}
@@ -69,6 +87,25 @@ export default function BoxesPage() {
                 {cat}
               </button>
             ))}
+            {/* ✅ Favorites Filter Pill */}
+            <button
+              onClick={handleFavoritesFilter}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
+                showFavorites
+                  ? 'bg-red-500 text-white shadow-md'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:border-red-300'
+              }`}
+            >
+              <Heart className={`w-3.5 h-3.5 ${showFavorites ? 'fill-white' : ''}`} />
+              Favorites
+              {favorites.length > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                  showFavorites ? 'bg-white/20' : 'bg-red-100 text-red-600'
+                }`}>
+                  {favorites.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -81,11 +118,18 @@ export default function BoxesPage() {
         ) : boxes.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-gray-400" />
+              {showFavorites
+                ? <Heart className="w-8 h-8 text-red-400" />
+                : <Search className="w-8 h-8 text-gray-400" />
+              }
             </div>
-            <h3 className="text-xl font-display font-semibold text-gray-700 mb-2">No boxes found</h3>
-            <p className="text-gray-400">Try a different search or category</p>
-            <button onClick={() => { setSearch(''); setSelectedCategory('All'); }} className="btn-primary mt-4">
+            <h3 className="text-xl font-display font-semibold text-gray-700 mb-2">
+              {showFavorites ? 'No favorites yet' : 'No boxes found'}
+            </h3>
+            <p className="text-gray-400">
+              {showFavorites ? 'Start saving boxes you love by clicking the ❤️' : 'Try a different search or category'}
+            </p>
+            <button onClick={() => { setSearch(''); setSelectedCategory('All'); setShowFavorites(false); }} className="btn-primary mt-4">
               Clear Filters
             </button>
           </div>
