@@ -6,6 +6,7 @@ import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import BoxComparePage from './pages/BoxComparePage';
 
 import HomePage from './pages/HomePage';
 import BoxesPage from './pages/BoxesPage';
@@ -44,6 +45,7 @@ function AppRoutes() {
       <Route path="/checkout" element={<AppLayout><CheckoutPage /></AppLayout>} />
       <Route path="/order-confirmation" element={<AppLayout><OrderConfirmationPage /></AppLayout>} />
       <Route path="/subscribe" element={<AppLayout><SubscribePage /></AppLayout>} />
+      <Route path="/compare" element={<AppLayout><BoxComparePage /></AppLayout>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/dashboard" element={<AppLayout><DashboardLayout /></AppLayout>}>
