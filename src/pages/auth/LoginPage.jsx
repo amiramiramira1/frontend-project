@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Package, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, loading } = useAuth();
+  const { login, loading, loginWithGoogle, loginWithFacebook } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
@@ -69,6 +69,47 @@ export default function LoginPage() {
             <button type="submit" disabled={loading} className="btn-primary w-full text-base mt-2">
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
+
+          {/* Divider */}
+     <div className="my-6 flex items-center gap-4">
+  <div className="h-px flex-1 bg-gray-200"></div>
+  <span className="text-xs text-gray-400">OR</span>
+  <div className="h-px flex-1 bg-gray-200"></div>
+      </div>
+
+         {/* Google Login */}
+      <button
+       type="button"
+         onClick={async () => {
+       const user = await loginWithGoogle();
+       navigate(user.role === 'admin' ? '/admin' : '/');
+         }}
+      className="w-full flex items-center justify-center gap-2 border border-gray-300 py-2 rounded-xl hover:bg-gray-50 transition"
+      >
+     <img
+     src="https://www.svgrepo.com/show/475656/google-color.svg"
+      className="w-5 h-5"
+      alt="Google"
+     />
+    Continue with Google
+    </button>
+
+        {/* Facebook Login */}
+    <button
+    type="button"
+    onClick={async () => {
+       const user = await loginWithFacebook();
+     navigate(user.role === 'admin' ? '/admin' : '/');
+    }}
+    className="w-full flex items-center justify-center gap-2 mt-3 bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition"
+    >
+     <img
+       src="https://www.svgrepo.com/show/475647/facebook-color.svg"
+       className="w-5 h-5"
+       alt="Facebook"
+       />
+       Continue with Facebook
+       </button>
 
             <div className="text-right mt-2">
             <Link

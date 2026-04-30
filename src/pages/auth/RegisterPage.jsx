@@ -4,23 +4,32 @@ import { useAuth } from '../../context/AuthContext';
 import { Package, Eye, EyeOff, CheckCircle } from 'lucide-react';
 
 export default function RegisterPage() {
-  const { register, loading } = useAuth();
+  const { register, loading, loginWithGoogle, loginWithFacebook } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
-    try {
-      await register(form.name, form.email, form.password);
-      navigate('/verify-email', { state: { email: form.email } });
-    } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
-    }
-  };
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
+
+  if (form.password.length < 6) {
+    setError('Password must be at least 6 characters');
+    return;
+  }
+
+  try {
+    await register(form.name, form.email, form.password);
+
+    navigate('/verify-email', {
+      state: { email: form.email }
+    });
+
+  } catch (err) {
+    setError(err.response?.data?.message || 'Registration failed');
+  }
+};
 
   const perks = ['Fresh ingredients weekly', 'No meal planning stress', 'Flexible serving sizes', 'Easy subscription management'];
 
@@ -77,6 +86,47 @@ export default function RegisterPage() {
               {loading ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
+
+          {/* Divider */}
+         <div className="my-6 flex items-center gap-4">
+         <div className="h-px flex-1 bg-gray-200"></div>
+         <span className="text-xs text-gray-400">OR</span>
+         <div className="h-px flex-1 bg-gray-200"></div>
+          </div>
+
+          {/* Google Signup */}
+         <button
+           type="button"
+        onClick={async() => {
+       const user = await loginWithGoogle();
+           navigate(user.role === 'admin' ? '/admin' : '/');
+         }}
+        className="w-full flex items-center justify-center gap-2 border border-gray-300 py-2 rounded-xl hover:bg-gray-50 transition"
+         >
+        <img
+        src="https://www.svgrepo.com/show/475656/google-color.svg"
+        className="w-5 h-5"
+        alt="Google"
+         />
+        Continue with Google
+         </button>
+
+       {/* Facebook Signup */}
+    <button
+    type="button"
+    onClick={async() => {
+  const user = await loginWithFacebook();
+    navigate(user.role === 'admin' ? '/admin' : '/');
+     }}
+      className="w-full flex items-center justify-center gap-2 mt-3 bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition"
+     >
+      <img
+       src="https://www.svgrepo.com/show/475647/facebook-color.svg"
+        className="w-5 h-5"
+          alt="Facebook"
+           />
+        Continue with Facebook
+          </button>
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{' '}

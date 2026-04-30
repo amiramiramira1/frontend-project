@@ -65,16 +65,70 @@ export const AuthProvider = ({ children }) => {
     toast.success('Logged out successfully');
   };
 
+  const loginWithGoogle = async () => {
+  setLoading(true);
+  try {
+    const mockUser = {
+      _id: 'google-user-' + Date.now(),
+      name: 'Google User',
+      email: 'googleuser@example.com',
+      role: 'user',
+      token: 'mock-google-token-' + Date.now(),
+    };
+
+    localStorage.setItem('boxify_token', mockUser.token);
+    localStorage.setItem('boxify_user', JSON.stringify(mockUser));
+    setUser(mockUser);
+
+    toast.success(`Welcome via Google, ${mockUser.name}!`);
+    return mockUser;
+  } finally {
+    setLoading(false);
+  }
+};
+
+const loginWithFacebook = async () => {
+  setLoading(true);
+  try {
+    const mockUser = {
+      _id: 'facebook-user-' + Date.now(),
+      name: 'Facebook User',
+      email: 'facebookuser@example.com',
+      role: 'user',
+      token: 'mock-facebook-token-' + Date.now(),
+    };
+
+    localStorage.setItem('boxify_token', mockUser.token);
+    localStorage.setItem('boxify_user', JSON.stringify(mockUser));
+    setUser(mockUser);
+
+    toast.success(`Welcome via Facebook, ${mockUser.name}!`);
+    return mockUser;
+  } finally {
+    setLoading(false);
+  }
+};
+
   const refreshUser = async () => {
     // No-op in mock mode
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, isAdmin: user?.role === 'admin' }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+<AuthContext.Provider value={{
+  user,
+  login,
+  register,
+  logout,
+  loginWithGoogle,
+  loginWithFacebook,
+  loading,
+  refreshUser,
+  isAdmin: user?.role === 'admin'
+     }}>
+  {children}
+</AuthContext.Provider>
+     );
+  };
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
