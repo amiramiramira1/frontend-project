@@ -16,7 +16,7 @@ export default function RegisterPage() {
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
     try {
       await register(form.name, form.email, form.password);
-      navigate('/');
+      navigate('/verify-email', { state: { email: form.email } });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     }

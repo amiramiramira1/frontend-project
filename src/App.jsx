@@ -24,6 +24,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 
 function AppLayout({ children }) {
   return (
@@ -57,6 +58,9 @@ function AppRoutes() {
 
       {/* Reset Password */}
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      {/*Email Verification*/}
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
 
 
 
