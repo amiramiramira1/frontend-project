@@ -62,8 +62,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('boxify_token');
     localStorage.removeItem('boxify_user');
     setUser(null);
-    toast.success('Logged out successfully');
-  };
+  };  
+
+   const deleteAccount = () => {
+    // mock delete (no backend)
+    logout();
+    toast.success('Account deleted successfully');
+   };
 
   const loginWithGoogle = async () => {
   setLoading(true);
@@ -119,6 +124,7 @@ const loginWithFacebook = async () => {
   login,
   register,
   logout,
+  deleteAccount,
   loginWithGoogle,
   loginWithFacebook,
   loading,

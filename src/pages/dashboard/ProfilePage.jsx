@@ -3,14 +3,18 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import { User, MapPin, Plus, Trash2, Save, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, deleteAccount } = useAuth();
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
   const [addresses, setAddresses] = useState(user?.addresses || []);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAddr, setNewAddr] = useState({ label: 'Home', street: '', city: 'Cairo', zip: '', phone: '', isDefault: false });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const navigate = useNavigate();
 
   const [preferences, setPreferences] = useState(() => {
   const saved = localStorage.getItem('boxify_preferences');
@@ -51,6 +55,26 @@ export default function ProfilePage() {
   };
 
   const removeAddress = (idx) => setAddresses(prev => prev.filter((_, i) => i !== idx));
+
+ const handleDelete = () => {
+  if (confirmText !== 'DELETE') {
+    toast.error('You must type DELETE');
+    return;
+  }
+
+  
+  const loadingToast = toast.loading('Deleting account...');
+  setTimeout(() => {
+     deleteAccount();
+     toast.dismiss(loadingToast);
+     toast.success('Goodbye 👋 Account deleted');
+   
+  setConfirmText('');
+  setShowDeleteConfirm(false);
+   
+   navigate('/');
+    }, 1000);
+   };
 
   return (
     <div className="space-y-6">
@@ -178,6 +202,52 @@ export default function ProfilePage() {
       <button onClick={saveProfile} disabled={saving} className="btn-primary flex items-center gap-2">
         <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Changes'}
       </button>
+
+      {/* Account Deletion Confirmation Modal */}
+    {showDeleteConfirm && (
+     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    
+     <div className="bg-white p-6 rounded-xl w-full max-w-md space-y-4">
+      
+      <h2 className="text-lg font-bold text-red-600">
+        Delete Account
+      </h2>
+
+      <p className="text-sm text-gray-600">
+        Type <b>DELETE</b> to confirm permanently deleting your account
+      </p>
+
+      <input
+        value={confirmText}
+        onChange={(e) => setConfirmText(e.target.value)}
+        className="input-field"
+        placeholder="Type DELETE"
+      />
+
+      <div className="flex justify-end gap-3">
+        
+        <button
+          onClick={() => {
+            setShowDeleteConfirm(false);
+            setConfirmText('');
+          }}
+          className="px-4 py-2 border rounded-lg"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleDelete}
+          className="bg-red-600 text-white px-4 py-2 rounded-lg"
+        >
+          Confirm Delete
+        </button>
+
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
