@@ -22,6 +22,8 @@ import OrdersPage from './pages/dashboard/OrdersPage';
 import SubscriptionsPage from './pages/dashboard/SubscriptionsPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
 function AppLayout({ children }) {
   return (
@@ -49,6 +51,14 @@ function AppRoutes() {
       {/* Auth pages (no standard footer but with brand) */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      
+      {/* Forgot Password */}
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+      {/* Reset Password */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+
 
       {/* Dashboard */}
      <Route element={<ProtectedRoute />}>
