@@ -21,6 +21,7 @@ import ProfilePage from './pages/dashboard/ProfilePage';
 import OrdersPage from './pages/dashboard/OrdersPage';
 import SubscriptionsPage from './pages/dashboard/SubscriptionsPage';
 import AdminLayout from './pages/admin/AdminLayout';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function AppLayout({ children }) {
   return (
@@ -50,14 +51,19 @@ function AppRoutes() {
       <Route path="/register" element={<RegisterPage />} />
 
       {/* Dashboard */}
-      <Route path="/dashboard" element={<AppLayout><DashboardLayout /></AppLayout>}>
-        <Route index element={<ProfilePage />} />
-        <Route path="orders" element={<OrdersPage />} />
-        <Route path="subscriptions" element={<SubscriptionsPage />} />
+     <Route element={<ProtectedRoute />}>
+     <Route path="/dashboard" element={<AppLayout><DashboardLayout /></AppLayout>}>
+     <Route index element={<ProfilePage />} />
+     <Route path="orders" element={<OrdersPage />} />
+     <Route path="subscriptions" element={<SubscriptionsPage />} />
+    </Route>
       </Route>
 
+
       {/* Admin */}
+    <Route element={<ProtectedRoute requireAdmin={true} />}>
       <Route path="/admin/*" element={<AdminLayout />} />
+    </Route>
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
