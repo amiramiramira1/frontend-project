@@ -21,6 +21,7 @@ import ProfilePage from './pages/dashboard/ProfilePage';
 import OrdersPage from './pages/dashboard/OrdersPage';
 import SubscriptionsPage from './pages/dashboard/SubscriptionsPage';
 import AdminLayout from './pages/admin/AdminLayout';
+import EditSubscriptionPage from './pages/dashboard/EditSubscriptionPage';
 
 function AppLayout({ children }) {
   return (
@@ -54,6 +55,7 @@ function AppRoutes() {
         <Route index element={<ProfilePage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
+        <Route path="subscriptions/:id/edit" element={<EditSubscriptionPage />} />
       </Route>
 
       {/* Admin */}
