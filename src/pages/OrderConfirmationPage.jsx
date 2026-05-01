@@ -58,7 +58,7 @@ export default function OrderConfirmationPage() {
           </div>
 
           {/* Order progress */}
-          <OrderTimeline status={order.status} horizontal />
+          <OrderTimeline status={order.status} />
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Link to="/dashboard/orders" className="btn-primary flex-1 flex items-center justify-center gap-2">
