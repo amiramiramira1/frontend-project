@@ -50,7 +50,7 @@ export default function OrderConfirmationPage() {
 
             {/* Delivery details */}
             <div className="bg-gray-50 rounded-2xl p-5 mb-4 text-left">
-              <h3 className="font-semibold text-gray-700 mb-3">Delivery Details</h3>
+              <h3 className="font-semibold text-gray-700 mb-3">Billing Address</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Name</span>
