@@ -54,6 +54,15 @@ export default function OrderConfirmationPage() {
                 <div className="text-brand-600 font-semibold">{formatted}</div>
               </div>
             </div>
+            {order.timeSlot && (
+              <div className="flex items-center gap-3 text-sm border-t border-gray-200 pt-3">
+                <Clock className="w-5 h-5 text-brand-500 flex-shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium text-gray-700">Time Slot</div>
+                  <div className="text-brand-600 font-semibold">{order.timeSlot}</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Order progress */}
