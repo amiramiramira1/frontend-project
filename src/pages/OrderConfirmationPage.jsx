@@ -1,5 +1,7 @@
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, Package, Truck, Clock, ArrowRight } from 'lucide-react';
+import { CheckCircle, Package, Truck, Clock, ArrowRight, Download } from 'lucide-react';
+import { useState } from 'react';
+import { generateReceipt } from '../utils/generateReceipt';
 
 export default function OrderConfirmationPage() {
   const { state } = useLocation();
@@ -13,6 +15,14 @@ export default function OrderConfirmationPage() {
 
   const deliveryDate = new Date(order.deliveryDate);
   const formatted = deliveryDate.toLocaleDateString('en-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+  setDownloading(true);
+  await generateReceipt(order);
+  setDownloading(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -68,11 +78,19 @@ export default function OrderConfirmationPage() {
             ))}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link to="/dashboard/orders" className="btn-primary flex-1 flex items-center justify-center gap-2">
+          <div className="flex flex-col gap-3">
+            <Link to="/dashboard/orders" className="btn-primary w-full flex items-center justify-center gap-2">
               <Package className="w-4 h-4" /> Track Order
             </Link>
-            <Link to="/boxes" className="btn-secondary flex-1 text-center">
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              {downloading ? 'Generating PDF...' : 'Download Receipt'}
+            </button>
+            <Link to="/boxes" className="btn-secondary w-full flex items-center justify-center gap-2">
               Continue Shopping
             </Link>
           </div>

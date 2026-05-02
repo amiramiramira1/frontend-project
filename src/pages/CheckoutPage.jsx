@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +16,8 @@ export default function CheckoutPage() {
     zip: user?.addresses?.[0]?.zip || '',
     phone: user?.addresses?.[0]?.phone || '',
   });
+
+  const orderPlaced = useRef(false);
 
   const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
 
@@ -35,9 +37,19 @@ export default function CheckoutPage() {
         deliveryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
+        createdAt: new Date().toISOString(),
+        items: cart.items,
+        deliveryAddress: { street: form.street, city: form.city, zip: form.zip, phone: form.phone },
+        customerName: user?.name,
+        customerEmail: user?.email,
       };
-      await clearCart();
+      
+      const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+      localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));
+
+      orderPlaced.current = true;
       navigate('/order-confirmation', { state: { order: mockOrder } });
+      try{ await clearCart(); } catch(_){}
     } catch (err) {
       toast.error('Order failed');
     } finally {
@@ -45,7 +57,7 @@ export default function CheckoutPage() {
     }
   };
 
-  if (!cart.items?.length) {
+  if (!cart.items?.length && !orderPlaced.current) {
     navigate('/cart'); return null;
   }
 

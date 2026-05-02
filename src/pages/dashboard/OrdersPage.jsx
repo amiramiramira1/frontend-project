@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Package, Clock, MapPin, CheckCircle, Truck, XCircle, ChefHat } from 'lucide-react';
+import { Package, Clock, MapPin, CheckCircle, Truck, XCircle, ChefHat, Download } from 'lucide-react';
+import { generateReceipt } from '../../utils/generateReceipt';
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'badge-orange', icon: Clock },
@@ -22,7 +23,13 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
-    api.get('/orders').then(({ data }) => setOrders(data)).finally(() => setLoading(false));
+    api.get('/orders')
+    .then(({ data }) => setOrders(data))
+    .catch(() => {
+      const saved = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+      setOrders(saved);
+    })
+    .finally(() => setLoading(false));
   }, [user]);
 
   if (loading) return (
@@ -30,6 +37,10 @@ export default function OrdersPage() {
       <div className="animate-spin w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full" />
     </div>
   );
+
+  const handleDownload = async (order) => {
+    await generateReceipt(order);
+  };
 
   return (
     <div>
@@ -58,6 +69,13 @@ export default function OrdersPage() {
                       <Icon className="w-3 h-3" /> {st.label}
                     </span>
                     <span className="font-display font-bold text-brand-600">{order.totalPrice?.toLocaleString()} EGP</span>
+                    <button
+                      onClick={() => handleDownload(order)}
+                      title="Download Receipt"
+                      className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
