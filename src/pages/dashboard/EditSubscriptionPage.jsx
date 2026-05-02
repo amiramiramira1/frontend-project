@@ -73,9 +73,8 @@ export default function EditSubscriptionPage() {
                         </div>
                     </div>
                         {sub.boxType === 'pre-made' && (
-                        <a href="/boxes" className="text-xs text-brand-600 font-semibold hover:underline">
-                        Change Box
-                        </a>
+                        // TODO: Change Box flow requires BoxDetailPage coordination — backend team to implement
+                            null  
                         )}
                     </div>
 

@@ -22,6 +22,7 @@ export default function SubscribePage() {
   const servings = parseInt(searchParams.get('servings') || '2');
   const name = searchParams.get('name') || 'Meal Box';
   const mealIds = searchParams.get('mealIds')?.split(',').filter(Boolean) || [];
+  const editSubId = searchParams.get('editSubId') || sessionStorage.getItem('editSubId');
 
   useEffect(() => { if (!user) navigate('/login'); }, [user]);
 
@@ -46,6 +47,8 @@ export default function SubscribePage() {
 
       const existing = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
       localStorage.setItem('boxify_subs', JSON.stringify([mockSub, ...existing]));
+
+      sessionStorage.removeItem('editSubId');
 
       toast.success('Subscription created! First order generated.');
       navigate('/dashboard/subscriptions');
