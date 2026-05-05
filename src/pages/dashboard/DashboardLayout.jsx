@@ -9,6 +9,7 @@ const navItems = [
   { to: '/dashboard', label: 'Profile', icon: User, end: true },
   { to: '/dashboard/orders', label: 'My Orders', icon: Package },
   { to: '/dashboard/subscriptions', label: 'Subscriptions', icon: Repeat },
+  { to: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function DashboardLayout() {

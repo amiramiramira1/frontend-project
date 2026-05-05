@@ -68,12 +68,86 @@ export const AuthProvider = ({ children }) => {
   const refreshUser = async () => {
     // No-op in mock mode
   };
+  const loginWithGoogle = async () => {
+  setLoading(true);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const mockUser = {
+        _id: 'google-user-' + Date.now(),
+        name: 'Google User',
+        email: 'googleuser@gmail.com',
+        role: 'user',
+        token: 'google-mock-token-' + Date.now(),
+      };
+
+      localStorage.setItem('boxify_token', mockUser.token);
+      localStorage.setItem('boxify_user', JSON.stringify(mockUser));
+      setUser(mockUser);
+
+      toast.success(`Logged in with Google as ${mockUser.name}`);
+      setLoading(false);
+      resolve(mockUser);
+    }, 1000);
+  });
+};
+
+const loginWithFacebook = async () => {
+  setLoading(true);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const mockUser = {
+        _id: 'facebook-user-' + Date.now(),
+        name: 'Facebook User',
+        email: 'fbuser@gmail.com',
+        role: 'user',
+        token: 'facebook-mock-token-' + Date.now(),
+      };
+
+      localStorage.setItem('boxify_token', mockUser.token);
+      localStorage.setItem('boxify_user', JSON.stringify(mockUser));
+      setUser(mockUser);
+
+      toast.success(`Logged in with Facebook as ${mockUser.name}`);
+      setLoading(false);
+      resolve(mockUser);
+    }, 1000);
+  });
+};
+const deleteAccount = async () => {
+  setLoading(true);
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      localStorage.removeItem('boxify_token');
+      localStorage.removeItem('boxify_user');
+      setUser(null);
+
+      toast.success('Account deleted successfully');
+
+      setLoading(false);
+      resolve(true);
+    }, 1500);
+  });
+};
+
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, refreshUser, isAdmin: user?.role === 'admin' }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  <AuthContext.Provider
+    value={{
+      user,
+      login,
+      register,
+      logout,
+      loading,
+      refreshUser,
+      isAdmin: user?.role === 'admin',
+      loginWithGoogle,
+      loginWithFacebook,
+    }}
+  >
+    {children}
+  </AuthContext.Provider>
+);
 };
 
 export const useAuth = () => {

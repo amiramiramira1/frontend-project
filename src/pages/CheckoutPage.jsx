@@ -4,11 +4,13 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
+import { useRef } from 'react';
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const orderPlaced = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     street: user?.addresses?.[0]?.street || '',
@@ -16,14 +18,28 @@ export default function CheckoutPage() {
     zip: user?.addresses?.[0]?.zip || '',
     phone: user?.addresses?.[0]?.phone || '',
   });
+  const [errors, setErrors] = useState({ zip: '', phone: '' });
 
   const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
+
+  const validate = () => {
+    const newErrors = { zip: '', phone: '' };
+    if (form.zip && !/^\d{5}$/.test(form.zip)) {
+      newErrors.zip = 'ZIP code must be exactly 5 digits';
+    }
+    if (!/^01[0125][0-9]{8}$/.test(form.phone)) {
+      newErrors.phone = 'Enter a valid Egyptian number (e.g. 01012345678)';
+    }
+    setErrors(newErrors);
+    return !newErrors.zip && !newErrors.phone;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.street || !form.city || !form.phone) {
       toast.error('Please fill all required fields'); return;
     }
+    if (!validate()) return;
     setSubmitting(true);
     try {
       // Mock order creation
@@ -35,19 +51,22 @@ export default function CheckoutPage() {
         deliveryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
+        createdAt: new Date().toISOString(),
+        items: cart.items,
       };
       const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
       localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));
-      await clearCart();
+      orderPlaced.current = true;
       navigate('/order-confirmation', { state: { order: mockOrder } });
+      try{  await clearCart();  } catch(_){}
     } catch (err) {
       toast.error('Order failed');
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (!cart.items?.length) {
+  
+  if (!cart.items?.length && !orderPlaced.current){
     navigate('/cart'); return null;
   }
 
@@ -81,14 +100,31 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">ZIP Code</label>
-                    <input value={form.zip} onChange={e => setForm(p => ({ ...p, zip: e.target.value }))} className="input-field" placeholder="11511" />
+                    <input 
+                      value={form.zip} 
+                      onChange={e => {
+                        setForm(p => ({ ...p, zip: e.target.value }));
+                        setErrors(p => ({ ...p, zip: '' }));
+                      }}
+                      className={`input-field ${errors.zip ? 'border-red-500 focus:ring-red-400' : ''}`}
+                      placeholder="11511" />
+                      {errors.zip && <p className="text-red-500 text-xs mt-1">{errors.zip}</p>}
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number *</label>
                     <div className="relative">
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input required value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className="input-field pl-11" placeholder="01012345678" />
+                      <input 
+                        required 
+                        value={form.phone} 
+                        onChange={e => {
+                          setForm(p => ({ ...p, phone: e.target.value }));
+                          setErrors(p => ({ ...p, phone: '' }));
+                        }}
+                        className={`input-field pl-11 ${errors.phone ? 'border-red-500 focus:ring-red-400' : ''}`}
+                        placeholder="01012345678" />
                     </div>
+                    {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                   </div>
                 </div>
               </div>
