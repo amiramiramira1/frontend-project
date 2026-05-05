@@ -51,6 +51,8 @@ export default function CheckoutPage() {
         deliveryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
+        createdAt: new Date().toISOString(),
+        items: cart.items,
       };
       const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
       localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));

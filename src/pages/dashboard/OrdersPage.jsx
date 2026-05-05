@@ -21,6 +21,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const [cancelId, setCancelId] = useState(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -38,6 +39,20 @@ export default function OrdersPage() {
       <div className="animate-spin w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full" />
     </div>
   );
+
+  const handleCancel = async (id) => {
+    try {
+      await api.patch(`/orders/${id}/cancel`);
+      toast.success('Order cancelled');
+    } catch {
+      const saved = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+      const updated = saved.map(o => o._id === id ? { ...o, status: 'cancelled' } : o);
+      localStorage.setItem('boxify_orders', JSON.stringify(updated));
+      setOrders(updated);
+      toast.success('Order cancelled');
+    }
+    setCancelId(null);
+  };
 
   return (
     <div>
@@ -71,9 +86,31 @@ export default function OrdersPage() {
 
                 <div className="text-sm text-gray-600 space-y-1 mb-3">
                   {order.items?.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Package className="w-3.5 h-3.5 text-brand-400" />
-                      {item.boxSnapshot?.name} · {item.mealsCount} meals · {item.servingsPerMeal} {item.servingsPerMeal === 1 ? 'person' : 'people'}
+                    <div key={i} className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-3.5 h-3.5 text-brand-400" />
+                        {item.type === 'pre-made-box' ? (
+                          <Link
+                            to={`/boxes/${item.boxId}`}
+                            className="text-brand-600 hover:underline font-medium"
+                          >
+                            {item.boxName}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-gray-700">Custom Box</span>
+                        )}
+                        × {item.quantity || 1}
+                      </div>
+                      {/* Show meals for custom boxes */}
+                      {item.type === 'custom-box' && item.meals?.length > 0 && (
+                        <div className="ml-6 space-y-0.5">
+                          {item.meals.map((meal, j) => (
+                            <div key={j} className="text-xs text-gray-400 flex items-center gap-1">
+                              <span>·</span> {meal.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -96,9 +133,59 @@ export default function OrdersPage() {
                   <OrderTimeline status={order.status} />
                 </div>
               )}
+
+              {order.status === 'pending' && (
+                <div className="pt-3 border-t border-gray-100 mt-3">
+                  <button
+                    onClick={() => setCancelId(order._id)}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                  >
+                    <XCircle className="w-4 h-4" /> Cancel Order
+                  </button>
+                </div>
+              )}
+
+              {order.status === 'cancelled' && (
+                <div className="pt-3 border-t border-gray-100 mt-3">
+                  <button
+                    onClick={() => {
+                      const saved = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+                      const updated = saved.filter(o => o._id !== order._id);
+                      localStorage.setItem('boxify_orders', JSON.stringify(updated));
+                      setOrders(updated);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                  >
+                    <XCircle className="w-4 h-4" /> Remove
+                  </button>
+                </div>
+              )}
+
               </div>
             );
           })}
+        </div>
+      )}
+      {cancelId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="card p-6 max-w-sm w-full">
+            <h3 className="font-display text-lg font-bold text-gray-900 mb-2">Cancel Order?</h3>
+            <p className="text-gray-500 text-sm mb-6">Are you sure you want to cancel this order? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleCancel(cancelId)}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+              >
+                Yes, Cancel
+              </button>
+              <button
+                onClick={() => setCancelId(null)}
+                className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-semibold text-sm transition-colors"
+              >
+                Keep Order
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
