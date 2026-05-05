@@ -86,15 +86,31 @@ export default function OrdersPage() {
 
                 <div className="text-sm text-gray-600 space-y-1 mb-3">
                   {order.items?.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Package className="w-3.5 h-3.5 text-brand-400" />
-                      <Link
-                        to={`/boxes/${item.boxId}`}
-                        className="text-brand-600 hover:underline font-medium"
-                      >
-                        {item.type === 'pre-made-box' ? item.boxName : 'Custom Box'}
-                      </Link>
-                      × {item.quantity || 1}
+                    <div key={i} className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-3.5 h-3.5 text-brand-400" />
+                        {item.type === 'pre-made-box' ? (
+                          <Link
+                            to={`/boxes/${item.boxId}`}
+                            className="text-brand-600 hover:underline font-medium"
+                          >
+                            {item.boxName}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-gray-700">Custom Box</span>
+                        )}
+                        × {item.quantity || 1}
+                      </div>
+                      {/* Show meals for custom boxes */}
+                      {item.type === 'custom-box' && item.meals?.length > 0 && (
+                        <div className="ml-6 space-y-0.5">
+                          {item.meals.map((meal, j) => (
+                            <div key={j} className="text-xs text-gray-400 flex items-center gap-1">
+                              <span>·</span> {meal.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
