@@ -117,22 +117,9 @@ export default function LoginPage() {
                 Password
               </label>
               <div className="relative">
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  required
-                  value={form.password}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, password: e.target.value }))
-                  }
-                  className="input-field pr-12"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
-                >
-                  {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                <input type="text" style={{ WebkitTextSecurity: showPw ? 'none' : 'disc' }} required value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="input-field pr-12" placeholder="••••••••" />
+                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>

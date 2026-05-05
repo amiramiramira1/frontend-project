@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Package, Instagram, Twitter, Facebook, Mail } from 'lucide-react';
+import {useAuth} from '../context/AuthContext';
 
 export default function Footer() {
+  const {isAdmin} = useAuth();
   return (
     <footer className="bg-gray-900 text-gray-300 mt-auto">
       <div className="page-container py-14">
@@ -44,6 +46,11 @@ export default function Footer() {
               <li><Link to="/dashboard/orders" className="hover:text-brand-400 transition-colors">My Orders</Link></li>
               <li><Link to="/dashboard/subscriptions" className="hover:text-brand-400 transition-colors">Subscriptions</Link></li>
               <li><Link to="/cart" className="hover:text-brand-400 transition-colors">Cart</Link></li>
+              {isAdmin && (
+                <li><Link to="/admin" className="hover:text-brand-400 transition-colors">Admin Panel</Link></li>
+              )}
+
+              
             </ul>
           </div>
 
