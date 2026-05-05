@@ -25,6 +25,7 @@ import OrdersPage from './pages/dashboard/OrdersPage';
 import SubscriptionsPage from './pages/dashboard/SubscriptionsPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import SettingsPage from './pages/dashboard/SettingsPage';
+import EditSubscriptionPage from './pages/dashboard/EditSubscriptionPage';
 
 function AppLayout({ children }) {
   return (
@@ -67,6 +68,7 @@ function AppRoutes() {
         <Route path="orders" element={<OrdersPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="subscriptions/:id/edit" element={<EditSubscriptionPage />} />
       </Route>
 
       {/* Admin */}
