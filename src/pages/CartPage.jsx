@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { promoCodes, sampleMeals } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart, ArrowRight, Package, Pencil, X, Check } from 'lucide-react';
 
 export default function CartPage() {
   const { cart, removeItem, updateItem, loading } = useCart();
-  const [promoCode, setPromoCode] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState(null);
-  const [promoError, setPromoError] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
   const [editingItem, setEditingItem] = useState(null);
@@ -32,9 +28,6 @@ export default function CartPage() {
   }
 
   const isEmpty = !cart.items || cart.items.length === 0;
-  const discountedTotal = appliedPromo
-    ? cart.cartTotal - cart.cartTotal * appliedPromo.discount
-    : cart.cartTotal;
 
   const handleQuantityChange = async (item, delta) => {
     const newQty = (item.quantity || 1) + delta;
@@ -43,18 +36,6 @@ export default function CartPage() {
       toast.success('Item removed');
     } else {
       await updateItem(item._id, { quantity: newQty });
-    }
-  };
-
-  const handleApplyPromo = () => {
-    const code = promoCode.trim().toUpperCase();
-    if (promoCodes[code]) {
-      setAppliedPromo({ code, ...promoCodes[code] });
-      setPromoError('');
-      toast.success(`Promo applied: ${promoCodes[code].label}`);
-    } else {
-      setPromoError('Invalid promo code');
-      setAppliedPromo(null);
     }
   };
 
@@ -192,29 +173,11 @@ export default function CartPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="mb-4">
-                    <div className="flex gap-2">
-                      <input
-                        value={promoCode}
-                        onChange={e => setPromoCode(e.target.value)}
-                        placeholder="Promo code"
-                        className="input-field text-sm flex-1"
-                      />
-                      <button onClick={handleApplyPromo} className="btn-primary px-4 text-sm">
-                        Apply
-                      </button>
-                    </div>
-                    {promoError && <p className="text-xs text-red-500 mt-1">{promoError}</p>}
-                    {appliedPromo && <p className="text-xs text-green-600 mt-1">✓ {appliedPromo.label} applied!</p>}
-                  </div>
                   <div className="border-t border-gray-100 pt-4 mb-6">
                     <div className="flex justify-between items-end">
                       <span className="font-semibold text-gray-700">Total</span>
                       <div className="text-right">
-                        {appliedPromo && (
-                          <div className="text-sm text-gray-400 line-through">{cart.cartTotal?.toLocaleString()} EGP</div>
-                        )}
-                        <div className="text-2xl font-display font-black text-brand-600">{discountedTotal?.toLocaleString()} EGP</div>
+                          <span className="text-2xl font-display font-black text-brand-600">{cart.cartTotal?.toLocaleString()} EGP</span>
                         <div className="text-xs text-gray-400">Cash on Delivery</div>
                       </div>
                     </div>
