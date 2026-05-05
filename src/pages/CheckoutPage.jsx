@@ -52,9 +52,11 @@ export default function CheckoutPage() {
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
       };
+      const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+      localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));
       orderPlaced.current = true;
-      await clearCart();
       navigate('/order-confirmation', { state: { order: mockOrder } });
+      try{  await clearCart();  } catch(_){}
     } catch (err) {
       toast.error('Order failed');
     } finally {

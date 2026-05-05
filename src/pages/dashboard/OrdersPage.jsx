@@ -4,6 +4,7 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Package, Clock, MapPin, CheckCircle, Truck, XCircle, ChefHat } from 'lucide-react';
+import OrderTimeline from '../../components/OrderTimeline';
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'badge-orange', icon: Clock },
@@ -19,10 +20,17 @@ export default function OrdersPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedOrder, setExpandedOrder] = useState(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
-    api.get('/orders').then(({ data }) => setOrders(data)).finally(() => setLoading(false));
+    api.get('/orders')
+    .then(({ data }) => setOrders(data))
+    .catch(() => {
+      const saved = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+      setOrders(saved);
+    })
+    .finally(() => setLoading(false));
   }, [user]);
 
   if (loading) return (
@@ -70,10 +78,24 @@ export default function OrdersPage() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-gray-400 border-t border-gray-100 pt-3">
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {order.deliveryAddress?.city}</span>
-                  <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> {new Date(order.deliveryDate).toLocaleDateString('en-EG')}</span>
+                <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                  <div className="flex items-center gap-4 text-xs text-gray-400">
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {order.deliveryAddress?.city || 'Cairo'}</span>
+                    <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> {new Date(order.deliveryDate).toLocaleDateString('en-EG')}</span>
                 </div>
+                <button
+                  onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)}
+                  className="text-xs text-brand-600 font-semibold hover:underline"
+                >
+                {expandedOrder === order._id ? 'Hide Tracking' : 'Track Order'}
+                </button>
+              </div>
+
+              {expandedOrder === order._id && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <OrderTimeline status={order.status} />
+                </div>
+              )}
               </div>
             );
           })}
