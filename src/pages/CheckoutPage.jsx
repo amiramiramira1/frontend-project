@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { promoCodes, sampleMeals } from '../data/mockData';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
 
@@ -18,6 +19,25 @@ export default function CheckoutPage() {
   });
 
   const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoError, setPromoError] = useState('');
+
+  const discountedTotal = appliedPromo
+    ? cart.cartTotal - cart.cartTotal * appliedPromo.discount
+    : cart.cartTotal;
+
+    const handleApplyPromo = () => {
+    const code = promoCode.trim().toUpperCase();
+    if (promoCodes[code]) {
+      setAppliedPromo({ code, ...promoCodes[code] });
+      setPromoError('');
+      toast.success(`Promo applied: ${promoCodes[code].label}`);
+    } else {
+      setPromoError('Invalid promo code');
+      setAppliedPromo(null);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,7 +51,9 @@ export default function CheckoutPage() {
       const mockOrder = {
         _id: 'order-' + Date.now(),
         orderNumber: 'BX-' + Math.floor(100000 + Math.random() * 900000),
-        totalPrice: cart.cartTotal,
+        totalPrice: discountedTotal,         
+        originalPrice: cart.cartTotal,        
+        appliedPromo: appliedPromo || null,   
         deliveryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
@@ -122,17 +144,39 @@ export default function CheckoutPage() {
             <div className="lg:col-span-1">
               <div className="card p-6 sticky top-24">
                 <h2 className="font-display text-xl font-bold mb-4">Order Summary</h2>
-                {cart.items.map(item => (
-                  <div key={item._id} className="flex justify-between text-sm py-2 border-b border-gray-100">
-                    <span className="text-gray-600 truncate pr-2">
-                      {item.type === 'pre-made-box' ? item.boxName : 'Custom Box'} ×{item.quantity || 1}
-                    </span>
-                    <span className="font-medium">{item.totalPrice?.toLocaleString()} EGP</span>
+                <div className="space-y-2 text-sm text-gray-600 mb-4">
+                    {cart.items.map(item => (
+                      <div key={item._id} className="flex justify-between">
+                        <span className="truncate pr-2">{item.type === 'pre-made-box' ? item.boxName : 'Custom Box'} ×{item.quantity || 1}</span>
+                        <span className="font-medium text-gray-900">{item.totalPrice?.toLocaleString()} EGP</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                <div className="flex justify-between items-center mt-4 pt-2">
-                  <span className="font-bold text-gray-800">Total</span>
-                  <span className="text-2xl font-display font-black text-brand-600">{cart.cartTotal?.toLocaleString()} EGP</span>
+                <div className="mb-4">
+                    <div className="flex gap-2">
+                      <input
+                        value={promoCode}
+                        onChange={e => setPromoCode(e.target.value)}
+                        placeholder="Promo code"
+                        className="input-field text-sm flex-1"
+                      />
+                      <button type="button" onClick={handleApplyPromo} className="btn-primary px-4 text-sm">
+                        Apply
+                      </button>
+                    </div>
+                    {promoError && <p className="text-xs text-red-500 mt-1">{promoError}</p>}
+                    {appliedPromo && <p className="text-xs text-green-600 mt-1">✓ {appliedPromo.label} applied!</p>}
+                  </div>
+                <div className="border-t border-gray-100 pt-4 mb-6">
+                  <div className="flex justify-between items-center mt-4 pt-2">
+                    <span className="font-bold text-gray-800">Total</span>
+                    <div className="text-right">
+                        {appliedPromo && (
+                          <div className="text-sm text-gray-400 line-through">{cart.cartTotal?.toLocaleString()} EGP</div>
+                        )}
+                        <div className="text-2xl font-display font-black text-brand-600">{discountedTotal?.toLocaleString()} EGP</div>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-between text-sm text-gray-500 mt-1">
                   <span>Delivery</span>

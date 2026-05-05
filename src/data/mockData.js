@@ -242,3 +242,9 @@ export function calculateCustomBoxPrice(mealIds, servingsPerMeal) {
     mealsCount: meals.length,
   };
 }
+
+export const promoCodes = {
+  'SAVE10': { discount: 0.10, label: '10% off' },
+  'SAVE20': { discount: 0.20, label: '20% off' },
+  'WELCOME': { discount: 0.15, label: '15% off' },
+};
