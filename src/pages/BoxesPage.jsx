@@ -20,7 +20,11 @@ export default function BoxesPage() {
       let filtered = sampleBoxes;
       if (search) {
         const q = search.toLowerCase();
-        filtered = filtered.filter(b => b.name.toLowerCase().includes(q) || b.description.toLowerCase().includes(q));
+        filtered = filtered.filter(b => {
+          const nameMatch = b.name.toLowerCase().includes(q);
+          const descMatch = q.length >= 3 && b.description.toLowerCase().includes(q);
+          return nameMatch || descMatch;
+        });
       }
       if (selectedCategory !== 'All') {
         filtered = filtered.filter(b => b.category === selectedCategory);
