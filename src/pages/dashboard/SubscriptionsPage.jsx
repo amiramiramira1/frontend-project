@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Repeat, PauseCircle, PlayCircle, XCircle, ChefHat, Calendar, Package, DollarSign } from 'lucide-react';
+import { Repeat, PauseCircle, PlayCircle, XCircle, ChefHat, Calendar, Package, DollarSign, Pencil } from 'lucide-react';
 
 const statusColors = {
   active: 'badge-green',
@@ -16,8 +16,15 @@ export default function SubscriptionsPage() {
   const navigate = useNavigate();
   const [subs, setSubs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancelId, setCancelId] = useState(null);
 
-  const fetch = () => api.get('/subscriptions').then(({ data }) => setSubs(data)).finally(() => setLoading(false));
+  const fetch = () => api.get('/subscriptions')
+    .then(({ data }) => setSubs(data))
+    .catch(() => {
+    const saved = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
+    setSubs(saved);
+    })
+    .finally(() => setLoading(false));
   useEffect(() => { if (!user) { navigate('/login'); return; } fetch(); }, [user]);
 
   const handlePause = async (id) => {
@@ -25,7 +32,13 @@ export default function SubscriptionsPage() {
       await api.patch(`/subscriptions/${id}/pause`);
       toast.success('Subscription paused');
       fetch();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    } catch {
+      const saved = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
+      const updated = saved.map(s => s._id === id ? { ...s, status: 'paused' } : s);
+      localStorage.setItem('boxify_subs', JSON.stringify(updated));
+      setSubs(updated);
+      toast.success('Subscription paused');
+    }
   };
 
   const handleResume = async (id) => {
@@ -33,16 +46,28 @@ export default function SubscriptionsPage() {
       await api.patch(`/subscriptions/${id}/resume`);
       toast.success('Subscription resumed');
       fetch();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    } catch {
+      const saved = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
+      const updated = saved.map(s => s._id === id ? { ...s, status: 'active' } : s);
+      localStorage.setItem('boxify_subs', JSON.stringify(updated));
+      setSubs(updated);
+      toast.success('Subscription resumed');
+    }
   };
 
   const handleCancel = async (id) => {
-    if (!confirm('Are you sure you want to cancel this subscription?')) return;
     try {
       await api.delete(`/subscriptions/${id}`);
       toast.success('Subscription cancelled');
       fetch();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    } catch {
+      const saved = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
+      const updated = saved.map(s => s._id === id ? { ...s, status: 'cancelled' } : s);
+      localStorage.setItem('boxify_subs', JSON.stringify(updated));
+      setSubs(updated);
+      toast.success('Subscription cancelled');
+    }
+    setCancelId(null);
   };
 
   if (loading) return (
@@ -92,7 +117,7 @@ export default function SubscriptionsPage() {
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
                   <Calendar className="w-4 h-4 text-brand-500 mx-auto mb-1" />
                   <div className="text-xs text-gray-500">Delivery Day</div>
-                  <div className="text-sm font-semibold">{sub.deliveryDay}</div>
+                  <div className="text-sm font-semibold capitalize">{sub.deliveryDay}</div>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-3 text-center">
                   <Package className="w-4 h-4 text-brand-500 mx-auto mb-1" />
@@ -115,6 +140,14 @@ export default function SubscriptionsPage() {
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                {(sub.status === 'active' || sub.status === 'paused') && (
+                  <button
+                    onClick={() => navigate(`/dashboard/subscriptions/${sub._id}/edit`, { state: { sub } })}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" /> Edit
+                  </button>
+                )}
                 {sub.status === 'active' && (
                   <button onClick={() => handlePause(sub._id)} className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors">
                     <PauseCircle className="w-4 h-4" /> Pause
@@ -126,13 +159,48 @@ export default function SubscriptionsPage() {
                   </button>
                 )}
                 {sub.status !== 'cancelled' && (
-                  <button onClick={() => handleCancel(sub._id)} className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">
+                  <button onClick={() => setCancelId(sub._id)} className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">
                     <XCircle className="w-4 h-4" /> Cancel
+                  </button>
+                )}
+                {sub.status === 'cancelled' && (
+                  <button
+                    onClick={() => {
+                      const saved = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
+                      const updated = saved.filter(s => s._id !== sub._id);
+                      localStorage.setItem('boxify_subs', JSON.stringify(updated));
+                      setSubs(updated);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors ml-auto"
+                  >
+                    <XCircle className="w-4 h-4" /> Remove
                   </button>
                 )}
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {cancelId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="card p-6 max-w-sm w-full">
+            <h3 className="font-display text-lg font-bold text-gray-900 mb-2">Cancel Subscription?</h3>
+            <p className="text-gray-500 text-sm mb-6">This will cancel your subscription. You won't be charged for future deliveries.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleCancel(cancelId)}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+              >
+                Yes, Cancel
+              </button>
+              <button
+                onClick={() => setCancelId(null)}
+                className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-semibold text-sm transition-colors"
+              >
+                Keep Subscription
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

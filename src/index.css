@@ -63,3 +63,23 @@
 
 /* Smooth scroll */
 html { scroll-behavior: smooth; }
+
+/* Date-Pick Calendar */
+.react-datepicker__day--selected,
+.react-datepicker__day--selected:hover,
+.react-datepicker__day--keyboard-selected {
+  background-color: #f97316 !important;
+  border-radius: 50%;
+}
+.react-datepicker {
+  font-size: 1rem !important;
+}
+.react-datepicker__day-name,
+.react-datepicker__day {
+  width: 2.2rem !important;
+  line-height: 2.2rem !important;
+  margin: 0.15rem !important;
+}
+.react-datepicker__current-month {
+  font-size: 1rem !important;
+}
