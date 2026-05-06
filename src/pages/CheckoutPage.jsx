@@ -87,10 +87,15 @@ export default function CheckoutPage() {
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
         createdAt: new Date().toISOString(),
-        items: cart.items,
-        deliveryAddress: { street: form.street, city: form.city, zip: form.zip, phone: form.phone },
+        deliveryAddress: {
+          street: form.street,
+          city: form.city,
+          zip: form.zip,
+          phone: form.phone,
+        },
         customerName: user?.name,
         customerEmail: user?.email,
+        items: cart.items,
       };
       
       const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
