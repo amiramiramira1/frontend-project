@@ -79,9 +79,6 @@ export default function OrderConfirmationPage() {
           {/* Order progress */}
           <OrderTimeline status={order.status} />
 
-          {/* Order progress */}
-          <OrderTimeline status={order.status} />
-
           <div className="flex flex-col sm:flex-row gap-3">
             <Link to="/dashboard/orders" className="btn-primary flex-1 flex items-center justify-center gap-2">
               <Package className="w-4 h-4" /> Track Order
