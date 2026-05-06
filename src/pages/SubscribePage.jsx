@@ -22,6 +22,7 @@ export default function SubscribePage() {
   const servings = parseInt(searchParams.get('servings') || '2');
   const name = searchParams.get('name') || 'Meal Box';
   const mealIds = searchParams.get('mealIds')?.split(',').filter(Boolean) || [];
+  const editSubId = searchParams.get('editSubId') || sessionStorage.getItem('editSubId');
 
   useEffect(() => { if (!user) navigate('/login'); }, [user]);
 
@@ -29,8 +30,26 @@ export default function SubscribePage() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Mock subscription — just simulate success
       await new Promise(r => setTimeout(r, 500));
+      const mockSub = {
+        _id: 'sub-' + Date.now(),
+        boxType: type,
+        boxName: name,
+        frequency: form.frequency,
+        deliveryDay: form.deliveryDay,
+        servingsPerMeal: servings,
+        mealsPerDelivery: 4,
+        totalDeliveries: form.frequency === 'weekly' ? 4 : 1,
+        fixedPricePerDelivery: 250,
+        status: 'active',
+        nextDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      const existing = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
+      localStorage.setItem('boxify_subs', JSON.stringify([mockSub, ...existing]));
+
+      sessionStorage.removeItem('editSubId');
+
       toast.success('Subscription created! First order generated.');
       navigate('/dashboard/subscriptions');
     } catch (err) {
