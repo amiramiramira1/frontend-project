@@ -1,8 +1,8 @@
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { CheckCircle, Package, Truck, Clock, ArrowRight, Download } from 'lucide-react';
-//import OrderTimeline from '../components/OrderTimeline';
+import OrderTimeline from '../components/OrderTimeline';
 import { useState } from 'react';
-//import { generateReceipt } from '../utils/generateReceipt';
+import { generateReceipt } from '../utils/generateReceipt';
 
 export default function OrderConfirmationPage() {
   const { state } = useLocation();
@@ -103,7 +103,7 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Order Timeline */}
-            {/*<OrderTimeline status={order.status} horizontal />*/}
+            <OrderTimeline status={order.status} horizontal />
           </div>
 
           {/* RIGHT COLUMN */}
