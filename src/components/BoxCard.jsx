@@ -1,8 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Users, ChefHat, ArrowRight, Heart, GitCompare } from 'lucide-react';
-import { useFavorites } from '../context/FavoritesContext';
-import { useAuth } from '../context/AuthContext';
-import toast from 'react-hot-toast';
+import { Clock, Users, ChefHat, ArrowRight, Zap } from 'lucide-react';
 
 const dietTags = {
   'vegetarian': { color: 'bg-green-100 text-green-700', label: '🌱 Vegetarian' },
@@ -12,30 +9,11 @@ const dietTags = {
   'high-protein': { color: 'bg-red-100 text-red-700', label: '💪 High-Protein' },
 };
 
-export default function BoxCard({ box, compareList = [], onCompareToggle }) {
+export default function BoxCard({ box }) {
   const displayPrice = box.startingPrice || 0;
-  const { toggleFavorite, isFavorite } = useFavorites();
-  const { user } = useAuth();
-  const favorited = isFavorite(box._id);
-  const isComparing = compareList.includes(box._id);
-
-  const handleFavorite = (e) => {
-    e.preventDefault();
-    if (!user) {
-      toast.error('Please log in to save favorites');
-      return;
-    }
-    toggleFavorite(box._id);
-    toast.success(favorited ? 'Removed from favorites' : 'Added to favorites! ❤️');
-  };
-
-  const handleCompare = (e) => {
-    e.preventDefault();
-    if (onCompareToggle) onCompareToggle(box._id);
-  };
 
   return (
-    <div className={`card group overflow-hidden hover:-translate-y-1 transition-all duration-300 ${isComparing ? 'ring-2 ring-brand-500' : ''}`}>
+    <div className="card group overflow-hidden hover:-translate-y-1 transition-all duration-300">
       {/* Image */}
       <div className="relative h-52 overflow-hidden">
         <img
@@ -48,20 +26,9 @@ export default function BoxCard({ box, compareList = [], onCompareToggle }) {
             <span className="badge bg-brand-500 text-white">⭐ Featured</span>
           </div>
         )}
-        <div className="absolute top-3 right-3 flex items-center gap-2">
+        <div className="absolute top-3 right-3">
           <span className="badge bg-white/90 text-gray-700 backdrop-blur-sm">{box.category}</span>
         </div>
-        {/* Heart Button */}
-        <button
-          onClick={handleFavorite}
-          className={`absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
-            favorited
-              ? 'bg-red-500 text-white scale-110'
-              : 'bg-white/90 text-gray-400 hover:text-red-500 hover:scale-110'
-          }`}
-        >
-          <Heart className={`w-4 h-4 ${favorited ? 'fill-white' : ''}`} />
-        </button>
       </div>
 
       {/* Content */}
@@ -82,7 +49,7 @@ export default function BoxCard({ box, compareList = [], onCompareToggle }) {
         </div>
 
         {/* Price & CTA */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-400">Starting from</p>
             <p className="text-2xl font-display font-black text-brand-600">
@@ -94,21 +61,6 @@ export default function BoxCard({ box, compareList = [], onCompareToggle }) {
             View Box <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-
-        {/* ✅ Compare Button */}
-        {onCompareToggle && (
-          <button
-            onClick={handleCompare}
-            className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-all ${
-              isComparing
-                ? 'border-brand-500 bg-brand-50 text-brand-600'
-                : 'border-gray-200 text-gray-500 hover:border-brand-300 hover:text-brand-500'
-            }`}
-          >
-            <GitCompare className="w-4 h-4" />
-            {isComparing ? 'Added to Compare ✓' : 'Add to Compare'}
-          </button>
-        )}
       </div>
     </div>
   );

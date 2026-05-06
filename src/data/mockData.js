@@ -167,11 +167,6 @@ export const sampleBoxes = [
     featured: true,
     startingPrice: 390,
     pricingOptions: buildPricingOptions(['meal-001', 'meal-005', 'meal-004']),
-    reviews: [
-      { _id: 'r-001-1', name: 'Sara Ahmed', rating: 5, comment: 'Absolutely delicious! The shawarma bowl was perfect.', date: 'April 2025' },
-      { _id: 'r-001-2', name: 'Mohamed Ali', rating: 4, comment: 'Great flavors, ingredients were very fresh. Will order again!', date: 'March 2025' },
-      { _id: 'r-001-3', name: 'Nour Hassan', rating: 5, comment: 'Best meal kit I have tried. Easy to follow instructions.', date: 'March 2025' },
-    ],
   },
   {
     _id: 'box-002',
@@ -184,11 +179,6 @@ export const sampleBoxes = [
     featured: true,
     startingPrice: 300,
     pricingOptions: buildPricingOptions(['meal-002', 'meal-006', 'meal-010']),
-    reviews: [
-      { _id: 'r-002-1', name: 'Layla Ibrahim', rating: 5, comment: 'Tastes just like my grandmother used to make. Incredible!', date: 'April 2025' },
-      { _id: 'r-002-2', name: 'Ahmed Mostafa', rating: 5, comment: 'The koshari was spot on. Fresh and affordable.', date: 'April 2025' },
-      { _id: 'r-002-3', name: 'Rania Khalil', rating: 4, comment: 'Loved the falafel wrap. Delivery was on time too.', date: 'March 2025' },
-    ],
   },
   {
     _id: 'box-003',
@@ -201,11 +191,6 @@ export const sampleBoxes = [
     featured: true,
     startingPrice: 530,
     pricingOptions: buildPricingOptions(['meal-003', 'meal-007', 'meal-009']),
-    reviews: [
-      { _id: 'r-003-1', name: 'Dina Samir', rating: 5, comment: 'Perfect for my diet. Salmon was cooked to perfection!', date: 'April 2025' },
-      { _id: 'r-003-2', name: 'Omar Fathy', rating: 4, comment: 'Healthy and tasty. The quinoa bowl is my favorite.', date: 'March 2025' },
-      { _id: 'r-003-3', name: 'Mona Adel', rating: 5, comment: 'Love how clean and fresh everything is. Highly recommend!', date: 'February 2025' },
-    ],
   },
   {
     _id: 'box-004',
@@ -218,11 +203,6 @@ export const sampleBoxes = [
     featured: false,
     startingPrice: 250,
     pricingOptions: buildPricingOptions(['meal-004', 'meal-008']),
-    reviews: [
-      { _id: 'r-004-1', name: 'Yasmine Nasser', rating: 5, comment: 'The pizza kit was so fun to make with my kids!', date: 'April 2025' },
-      { _id: 'r-004-2', name: 'Karim Sherif', rating: 4, comment: 'Risotto was creamy and delicious. Great date night meal.', date: 'March 2025' },
-      { _id: 'r-004-3', name: 'Hana Walid', rating: 5, comment: 'Restaurant quality at home. Will definitely reorder!', date: 'March 2025' },
-    ],
   },
   {
     _id: 'box-005',
@@ -235,11 +215,6 @@ export const sampleBoxes = [
     featured: false,
     startingPrice: 450,
     pricingOptions: buildPricingOptions(['meal-002', 'meal-004', 'meal-006', 'meal-009']),
-    reviews: [
-      { _id: 'r-005-1', name: 'Salma Tarek', rating: 5, comment: 'As a vegetarian, this box is a dream. So much variety!', date: 'April 2025' },
-      { _id: 'r-005-2', name: 'Yousef Magdy', rating: 4, comment: 'Really good plant-based options. Fresh and filling.', date: 'March 2025' },
-      { _id: 'r-005-3', name: 'Nadia Bassem', rating: 5, comment: 'Finally a meal kit that caters to vegetarians properly!', date: 'February 2025' },
-    ],
   },
   {
     _id: 'box-006',
@@ -252,11 +227,6 @@ export const sampleBoxes = [
     featured: false,
     startingPrice: 650,
     pricingOptions: buildPricingOptions(['meal-001', 'meal-003', 'meal-007', 'meal-010']),
-    reviews: [
-      { _id: 'r-006-1', name: 'Hassan Rami', rating: 5, comment: 'Perfect for my gym diet. High protein and super tasty!', date: 'April 2025' },
-      { _id: 'r-006-2', name: 'Farid Nabil', rating: 5, comment: 'The steak was incredible. Best meal kit for athletes.', date: 'March 2025' },
-      { _id: 'r-006-3', name: 'Alia Shawky', rating: 4, comment: 'Great portions and very fresh ingredients. Love it!', date: 'March 2025' },
-    ],
   },
 ];
 
