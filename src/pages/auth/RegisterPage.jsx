@@ -16,7 +16,7 @@ export default function RegisterPage() {
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
     try {
       await register(form.name, form.email, form.password);
-      navigate('/');
+      navigate('/verify-email', { state: { email: form.email } });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     }
@@ -67,7 +67,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
               <div className="relative">
-                <input type={showPw ? 'text' : 'password'} required value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="input-field pr-12" placeholder="Min 6 characters" />
+                <input type="text" style={{ WebkitTextSecurity: showPw ? 'none' : 'disc' }} required value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="input-field pr-12" placeholder="Min 6 characters" />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>

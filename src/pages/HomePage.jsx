@@ -40,17 +40,19 @@ export default function HomePage() {
             className="w-full h-full object-cover opacity-20"
           />
         </div>
-        <div className="relative page-container py-24 md:py-36">
+        {/* ✅ تعديل 3: قلّلنا الـ padding على الموبايل */}
+        <div className="relative page-container py-8 md:py-36">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
               <Star className="w-4 h-4 text-brand-400 fill-brand-400" />
               <span className="text-sm font-medium">Fresh Ingredients. Real Meals.</span>
             </div>
-            <h1 className="font-display text-5xl md:text-7xl font-black leading-tight mb-6">
+            {/* ✅ تعديل 1: النص بيبدأ صغير على الموبايل ويكبر تدريجياً */}
+            <h1 className="font-display text-3xl sm:text-5xl md:text-7xl font-black leading-tight mb-6">
               Cook Amazing
               <span className="block text-gradient">Meals at Home</span>
             </h1>
-            <p className="text-lg md:text-xl text-gray-300 mb-10 leading-relaxed">
+            <p className="text-xs md:text-xl text-gray-500 mb-10 leading-relaxed">
               Pre-portioned fresh ingredients delivered weekly. Choose from our curated meal boxes or build your own. No planning, no waste, just delicious food.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -62,8 +64,8 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Stats */}
-            <div className="mt-14 flex gap-10">
+            {/* ✅ تعديل 2: Stats مش بتتضغط على الموبايل */}
+            <div className="mt-10 flex flex-wrap gap-3 md:gap-10">
               {[['500+', 'Happy Families'], ['12+', 'Fresh Meals'], ['3-5', 'Day Delivery']].map(([val, label]) => (
                 <div key={label}>
                   <div className="text-3xl font-display font-bold text-brand-400">{val}</div>
@@ -76,20 +78,20 @@ export default function HomePage() {
       </section>
 
       {/* FEATURES */}
-      <section className="py-20 bg-white">
+      <section className="py-10 bg-white">
         <div className="page-container">
           <div className="text-center mb-14">
             <h2 className="section-title">Why Choose Boxify?</h2>
             <p className="section-subtitle">Everything you need for a stress-free cooking experience</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4  gap-6">
             {features.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="card p-6 text-center group hover:-translate-y-1 transition-transform duration-300">
-                <div className="w-14 h-14 bg-gradient-to-br from-brand-100 to-brand-200 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                  <Icon className="w-7 h-7 text-brand-600" />
+              <div key={title} className="card p-4 text-center group hover:-translate-y-1 transition-transform duration-300">
+                <div className="w-10 h-10 bg-gradient-to-br from-brand-100 to-brand-200 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                  <Icon className="w-5 h-5 text-brand-600" />
                 </div>
                 <h3 className="font-display font-bold text-gray-900 mb-2">{title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+                <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -97,20 +99,21 @@ export default function HomePage() {
       </section>
 
       {/* FEATURED BOXES */}
-      <section className="py-20 bg-gray-50">
+      <section className="pt-6 pb-4 bg-gray-50">
         <div className="page-container">
-          <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="section-title">Featured Boxes</h2>
-              <p className="section-subtitle mt-2">Our most popular meal collections</p>
+              <p className="section-subtitle mt-2 text-sm">Most popular collections</p>
             </div>
-            <Link to="/boxes" className="hidden md:flex items-center gap-2 text-brand-600 font-semibold hover:gap-3 transition-all">
-              View all <ChevronRight className="w-4 h-4" />
-            </Link>
+            {/* ✅ تعديل 4: "View all" بيظهر على الموبايل كمان */}
+            <Link to="/boxes" className="flex items-center gap-1 text-sm whitespace-nowrap text-brand-600 font-semibold transition-all">
+  View all <ChevronRight className="w-4 h-4" />
+</Link>
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1  gap-4">
               {[1,2,3].map(i => (
                 <div key={i} className="card h-80 animate-pulse bg-gray-100 rounded-2xl" />
               ))}
@@ -121,20 +124,21 @@ export default function HomePage() {
             </div>
           )}
 
-          <div className="text-center mt-10">
+          <div className="text-center mt-8">
             <Link to="/boxes" className="btn-outline">Browse All Boxes</Link>
           </div>
         </div>
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="py-20 bg-white">
+    <section className="pt-8 pb-10 bg-white">
         <div className="page-container">
-          <div className="text-center mb-14">
+          <div className="text-center mb-6">
             <h2 className="section-title">How Boxify Works</h2>
             <p className="section-subtitle">From selection to your table in 4 simple steps</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* ✅ تعديل 6: على الموبايل بيتوزعوا على عمودين بدل عمود واحد */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {steps.map((step, idx) => (
               <div key={step.num} className="relative text-center">
                 {idx < steps.length - 1 && (
@@ -152,11 +156,12 @@ export default function HomePage() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 bg-gradient-to-br from-brand-500 to-brand-700">
+      <section className="py-10 bg-gradient-to-br from-brand-500 to-brand-700">
         <div className="page-container text-center text-white">
           <Package className="w-16 h-16 mx-auto mb-6 opacity-80" />
-          <h2 className="font-display text-4xl md:text-5xl font-black mb-4">Ready to start cooking?</h2>
-          <p className="text-xl opacity-80 mb-8">Join thousands of families enjoying fresh, home-cooked meals every week.</p>
+          {/* ✅ تعديل 5: النصوص في CTA أصغر على الموبايل */}
+          <h2 className="font-display text-2xl sm:text-4xl md:text-5xl font-black mb-4">Ready to start cooking?</h2>
+          <p className="text-base md:text-xl opacity-80 mb-8">Join thousands of families enjoying fresh, home-cooked meals every week.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/register" className="bg-white text-brand-600 font-bold px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-md">
               Get Started Free

@@ -140,10 +140,10 @@ export default function Navbar() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="md:hidden pb-4 border-t border-gray-100 mt-1 pt-3 animate-fade-in">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-0">
               {navLinks.map(link => (
                 <NavLink key={link.to} to={link.to} onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) => `px-4 py-3 rounded-xl text-sm font-medium ${isActive ? 'bg-brand-50 text-brand-600' : 'text-gray-700 hover:bg-gray-50'}`}>
+                  className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-medium ${isActive ? 'bg-brand-50 text-brand-600' : 'text-gray-700 hover:bg-gray-50'}`}>
                   {link.label}
                 </NavLink>
               ))}

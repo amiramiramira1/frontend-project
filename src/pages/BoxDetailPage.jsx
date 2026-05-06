@@ -4,9 +4,8 @@ import { Helmet } from 'react-helmet-async';
 import { sampleBoxes } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { useFavorites } from '../context/FavoritesContext';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Users, Clock, Flame, ShoppingCart, Repeat, Star, ChefHat, AlertCircle, PenLine, X, CheckCircle, ArrowUpDown, Heart } from 'lucide-react';
+import { ChevronLeft, Users, Clock, Flame, ShoppingCart, Repeat, Star, ChefHat, AlertCircle, PenLine, X, CheckCircle, ArrowUpDown } from 'lucide-react';
 import StarRating from '../components/StarRating';
 
 const servingOptions = [
@@ -42,7 +41,6 @@ export default function BoxDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
-  const { toggleFavorite, isFavorite } = useFavorites();
   const [box, setBox] = useState(null);
   const [loading, setLoading] = useState(true);
   const [servings, setServings] = useState(2);
@@ -70,17 +68,6 @@ export default function BoxDetailPage() {
   const avgRating = reviews.length
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
     : null;
-
-  const favorited = box ? isFavorite(box._id) : false;
-
-  const handleFavorite = () => {
-    if (!user) {
-      toast.error('Please log in to save favorites');
-      return;
-    }
-    toggleFavorite(box._id);
-    toast.success(favorited ? 'Removed from favorites' : 'Added to favorites! ❤️');
-  };
 
   const sortedReviews = [...reviews].sort((a, b) => {
     if (sortBy === 'highest') return b.rating - a.rating;
@@ -167,25 +154,9 @@ export default function BoxDetailPage() {
       <div className="relative h-72 md:h-96">
         <img src={box.image || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=1200'} alt={box.name} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-        {/* Back + Heart على الصورة */}
-        <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
-          <button onClick={() => navigate('/boxes')} className="bg-white/90 backdrop-blur-sm text-gray-800 font-medium px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-white transition-colors text-sm">
-            <ChevronLeft className="w-4 h-4" /> Back
-          </button>
-          {/* ✅ Heart Button على الصورة */}
-          <button
-            onClick={handleFavorite}
-            className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
-              favorited
-                ? 'bg-red-500 text-white scale-110'
-                : 'bg-white/90 text-gray-400 hover:text-red-500 hover:scale-110'
-            }`}
-          >
-            <Heart className={`w-5 h-5 ${favorited ? 'fill-white' : ''}`} />
-          </button>
-        </div>
-
+        <button onClick={() => navigate('/boxes')} className="absolute top-6 left-6 bg-white/90 backdrop-blur-sm text-gray-800 font-medium px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-white transition-colors text-sm">
+          <ChevronLeft className="w-4 h-4" /> Back
+        </button>
         <div className="absolute bottom-6 left-6 right-6">
           <div className="flex items-center gap-2 mb-2">
             <span className="badge bg-brand-500 text-white">{box.category}</span>
@@ -245,6 +216,7 @@ export default function BoxDetailPage() {
 
             {/* REVIEWS SECTION */}
             <div>
+              {/* ✅ زرار أصغر */}
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-display text-2xl font-bold">Customer Reviews</h2>
                 <button
@@ -295,6 +267,7 @@ export default function BoxDetailPage() {
                     </button>
                   </div>
 
+                  {/* Star Picker */}
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-700 mb-3">Your Rating</p>
                     <div className="flex items-center gap-2">
@@ -321,6 +294,7 @@ export default function BoxDetailPage() {
                     </div>
                   </div>
 
+                  {/* Comment */}
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-700 mb-2">Your Review</p>
                     <textarea
@@ -378,6 +352,7 @@ export default function BoxDetailPage() {
                     {sortedReviews.map(review => (
                       <div key={review._id} className="card p-5 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between mb-3">
+                          {/* ✅ اسم مظبوط على الموبايل */}
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${getAvatarColor(review.name)}`}>
                               {review.name[0]}
@@ -401,6 +376,7 @@ export default function BoxDetailPage() {
                 </>
               )}
             </div>
+
           </div>
 
           {/* Right: Order Panel */}
@@ -461,23 +437,38 @@ export default function BoxDetailPage() {
                 {adding ? 'Adding...' : 'Add to Cart'}
               </button>
 
-              {/* ✅ Heart Button في الـ Order Panel */}
-              <button
-                onClick={handleFavorite}
-                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 font-semibold text-sm transition-all mb-3 ${
-                  favorited
-                    ? 'border-red-400 bg-red-50 text-red-500'
-                    : 'border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-400'
-                }`}
-              >
-                <Heart className={`w-4 h-4 ${favorited ? 'fill-red-500' : ''}`} />
-                {favorited ? 'Saved to Favorites' : 'Save to Favorites'}
-              </button>
-
               <button onClick={handleSubscribe} className="btn-outline w-full flex items-center justify-center gap-2">
                 <Repeat className="w-4 h-4" />
                 Subscribe Weekly
               </button>
+
+              {currentPricing && (
+                <div className="bg-gray-50 rounded-xl p-3 mt-4">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Nutritional Summary</p>
+
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-2">
+                    <Flame className="w-3.5 h-3.5 text-orange-400" />
+                    <span>{currentPricing.totalCalories?.toLocaleString()} total calories</span>
+                  </div>
+
+                  {allTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {allTags.map(tag => (
+                        <span key={tag} className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded-md">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {allergens.length > 0 && (
+                    <div className="text-xs text-orange-600 bg-orange-50 rounded-lg p-2">
+                      ⚠️ Contains: {allergens.join(' · ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
 
               <p className="text-xs text-gray-400 text-center mt-3">Free delivery • Fresh ingredients</p>
             </div>

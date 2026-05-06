@@ -3,10 +3,10 @@ import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { FavoritesProvider } from './context/FavoritesContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
+// Pages
 import HomePage from './pages/HomePage';
 import BoxesPage from './pages/BoxesPage';
 import BoxDetailPage from './pages/BoxDetailPage';
@@ -63,16 +63,14 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>
-            <FavoritesProvider>
-              <AppRoutes />
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  style: { borderRadius: '12px', fontFamily: 'Inter, sans-serif', fontSize: '14px' },
-                  success: { iconTheme: { primary: '#f79408', secondary: '#fff' } },
-                }}
-              />
-            </FavoritesProvider>
+            <AppRoutes />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: { borderRadius: '12px', fontFamily: 'Inter, sans-serif', fontSize: '14px' },
+                success: { iconTheme: { primary: '#f79408', secondary: '#fff' } },
+              }}
+            />
           </CartProvider>
         </AuthProvider>
       </BrowserRouter>
