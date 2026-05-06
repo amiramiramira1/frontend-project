@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Package, Clock, MapPin, CheckCircle, Truck, XCircle, ChefHat } from 'lucide-react';
+import { Package, Clock, MapPin, CheckCircle, Truck, XCircle, ChefHat, Download } from 'lucide-react';
+import { generateReceipt } from '../../utils/generateReceipt';
 import OrderTimeline from '../../components/OrderTimeline';
 
 const statusConfig = {
@@ -54,6 +55,10 @@ export default function OrdersPage() {
     setCancelId(null);
   };
 
+  const handleDownload = async (order) => {
+    await generateReceipt(order);
+  };
+
   return (
     <div>
       <h2 className="font-display text-2xl font-bold mb-6">My Orders</h2>
@@ -81,6 +86,13 @@ export default function OrdersPage() {
                       <Icon className="w-3 h-3" /> {st.label}
                     </span>
                     <span className="font-display font-bold text-brand-600">{order.totalPrice?.toLocaleString()} EGP</span>
+                    <button
+                      onClick={() => handleDownload(order)}
+                      title="Download Receipt"
+                      className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
