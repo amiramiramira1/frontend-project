@@ -1,15 +1,36 @@
 import { Link } from 'react-router-dom';
-import { Package, Instagram, Twitter, Facebook, Mail } from 'lucide-react';
-import {useAuth} from '../context/AuthContext';
+import { Package, Instagram, Twitter, Facebook, Mail, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
+
+function AccordionSection({ title, children }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="border-b border-gray-800 md:border-none">
+      <button
+        className="w-full flex items-center justify-between py-4 md:py-0 text-left"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <h4 className="font-semibold text-white">{title}</h4>
+        <ChevronDown
+          className={`w-4 h-4 md:hidden transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <ul className={`space-y-2.5 text-sm overflow-hidden transition-all duration-300 md:block
+        ${isOpen ? 'max-h-40 mb-4' : 'max-h-0 md:max-h-none'}`}>
+        {children}
+      </ul>
+    </div>
+  );
+}
 
 export default function Footer() {
-  const {isAdmin} = useAuth();
   return (
     <footer className="bg-gray-900 text-gray-300 mt-auto">
-      <div className="page-container py-14">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+      <div className="page-container py-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-0 md:gap-10">
           {/* Brand */}
-          <div className="md:col-span-1">
+          <div className="md:col-span-1 mb-0">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-9 h-9 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
                 <Package className="w-5 h-5 text-white" />
@@ -19,7 +40,7 @@ export default function Footer() {
             <p className="text-sm text-gray-400 leading-relaxed mb-4">
               Fresh, pre-portioned meal kits delivered to your door. Cook like a chef, waste less, live better.
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 mb-0">
               {[Instagram, Twitter, Facebook].map((Icon, idx) => (
                 <a key={idx} href="#" className="w-9 h-9 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-brand-500 transition-colors">
                   <Icon className="w-4 h-4" />
@@ -28,43 +49,29 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Links */}
-          <div>
-            <h4 className="font-semibold text-white mb-4">Shop</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><Link to="/boxes" className="hover:text-brand-400 transition-colors">All Meal Boxes</Link></li>
-              <li><Link to="/build-box" className="hover:text-brand-400 transition-colors">Build Custom Box</Link></li>
-              <li><Link to="/boxes?category=Mediterranean" className="hover:text-brand-400 transition-colors">Mediterranean</Link></li>
-              <li><Link to="/boxes?category=Healthy" className="hover:text-brand-400 transition-colors">Healthy Options</Link></li>
-            </ul>
-          </div>
+          {/* Accordion Sections */}
+          <AccordionSection title="Shop">
+            <li><Link to="/boxes" className="hover:text-brand-400 transition-colors">All Meal Boxes</Link></li>
+            <li><Link to="/build-box" className="hover:text-brand-400 transition-colors">Build Custom Box</Link></li>
+            <li><Link to="/boxes?category=Mediterranean" className="hover:text-brand-400 transition-colors">Mediterranean</Link></li>
+            <li><Link to="/boxes?category=Healthy" className="hover:text-brand-400 transition-colors">Healthy Options</Link></li>
+          </AccordionSection>
 
-          <div>
-            <h4 className="font-semibold text-white mb-4">Account</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li><Link to="/dashboard" className="hover:text-brand-400 transition-colors">My Dashboard</Link></li>
-              <li><Link to="/dashboard/orders" className="hover:text-brand-400 transition-colors">My Orders</Link></li>
-              <li><Link to="/dashboard/subscriptions" className="hover:text-brand-400 transition-colors">Subscriptions</Link></li>
-              <li><Link to="/cart" className="hover:text-brand-400 transition-colors">Cart</Link></li>
-              {isAdmin && (
-                <li><Link to="/admin" className="hover:text-brand-400 transition-colors">Admin Panel</Link></li>
-              )}
+          <AccordionSection title="Account">
+            <li><Link to="/dashboard" className="hover:text-brand-400 transition-colors">My Dashboard</Link></li>
+            <li><Link to="/dashboard/orders" className="hover:text-brand-400 transition-colors">My Orders</Link></li>
+            <li><Link to="/dashboard/subscriptions" className="hover:text-brand-400 transition-colors">Subscriptions</Link></li>
+            <li><Link to="/cart" className="hover:text-brand-400 transition-colors">Cart</Link></li>
+          </AccordionSection>
 
-              
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold text-white mb-4">Contact</h4>
-            <ul className="space-y-2.5 text-sm">
-              <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-brand-400" /> hello@boxify.eg</li>
-              <li className="text-gray-400">Cairo, Egypt</li>
-              <li className="text-gray-400">Delivery: Sat–Thu</li>
-            </ul>
-          </div>
+          <AccordionSection title="Contact">
+            <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-brand-400" /> hello@boxify.eg</li>
+            <li className="text-gray-400">Cairo, Egypt</li>
+            <li className="text-gray-400">Delivery: Sat–Thu</li>
+          </AccordionSection>
         </div>
 
-        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="border-t border-gray-800 mt-4 pt-2 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-500">© 2026 Boxify. All rights reserved.</p>
           <div className="flex gap-6 text-sm text-gray-500">
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
