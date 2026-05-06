@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import { promoCodes, sampleMeals } from '../data/mockData';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
-import { useRef } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -24,8 +23,6 @@ export default function CheckoutPage() {
     timeSlot: '', 
   });
   const [errors, setErrors] = useState({ street: '', zip: '', phone: '',timeSlot: '', deliveryDate: '' });
-
-  const orderPlaced = useRef(false);
 
   const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
   const timeSlots = ['9AM–12PM', '12PM–3PM', '3PM–6PM', '6PM–9PM'];
