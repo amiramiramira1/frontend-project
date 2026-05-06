@@ -121,7 +121,7 @@ export default function CheckoutPage() {
                     selected={form.deliveryDate ? new Date(form.deliveryDate) : null}
                     onChange={date => setForm(p => ({ ...p, deliveryDate: date.toISOString().split('T')[0] }))}
                     minDate={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)}
-                    maxDate={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)}
+                    maxDate={new Date(Date.now() + 9 * 24 * 60 * 60 * 1000)}
                     dateFormat="dd MMMM, yyyy"
                     placeholderText="Select a delivery date"
                     className="input-field w-full"
