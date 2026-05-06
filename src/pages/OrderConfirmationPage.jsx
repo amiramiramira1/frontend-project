@@ -7,7 +7,7 @@ import { generateReceipt } from '../utils/generateReceipt';
 export default function OrderConfirmationPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { order } = useLocation().state;
+  const order = state?.order;
 
   if (!order) {
     navigate('/');
