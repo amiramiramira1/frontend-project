@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { sampleBoxes } from '../data/mockData';
 import BoxCard from '../components/BoxCard';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
@@ -15,7 +16,6 @@ export default function BoxesPage() {
 
   useEffect(() => {
     setLoading(true);
-    // Simulate a small delay for realistic feel
     const timer = setTimeout(() => {
       let filtered = sampleBoxes;
       if (search) {
@@ -37,6 +37,13 @@ export default function BoxesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Helmet>
+        <title>All Meal Boxes — Boxify</title>
+        <meta name="description" content="Browse all our curated meal boxes. Fresh ingredients delivered weekly across Egypt." />
+        <meta property="og:title" content="All Meal Boxes — Boxify" />
+        <meta property="og:description" content="Browse all our curated meal boxes. Fresh ingredients delivered weekly across Egypt." />
+      </Helmet>
+
       {/* Header */}
       <div className="bg-white border-b border-gray-100">
         <div className="page-container py-10">

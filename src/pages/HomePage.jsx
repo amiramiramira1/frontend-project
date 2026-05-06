@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { ArrowRight, Clock, Users, Leaf, Star, ChevronRight, Package, Truck, ChevronLeft, CheckCircle } from 'lucide-react';
 import BoxCard from '../components/BoxCard';
 import { useEffect, useState, useRef } from 'react';
@@ -107,6 +108,20 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen">
+      <Helmet>
+  <title>Boxify — Fresh Meal Kits Delivered to Your Door</title>
+  <meta name="description" content="Pre-portioned fresh ingredients delivered weekly. Choose from our curated meal boxes or build your own. No planning, no waste, just delicious food." />
+  <meta property="og:title" content="Boxify — Fresh Meal Kits Delivered" />
+  <meta property="og:description" content="Fresh meal kits delivered to your door in Egypt. Cook amazing meals at home with pre-portioned ingredients." />
+  <script type="application/ld+json">{JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Boxify",
+    "description": "Fresh meal kits delivered to your door in Egypt",
+    "url": "https://boxify.com"
+  })}</script>
+</Helmet>
+
       {/* HERO */}
       <section className="relative bg-hero-pattern text-white overflow-hidden">
         <div className="absolute inset-0">
