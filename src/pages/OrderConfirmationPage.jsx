@@ -1,5 +1,8 @@
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, Package, Truck, Clock, ArrowRight } from 'lucide-react';
+import { CheckCircle, Package, Truck, Clock, ArrowRight, Download } from 'lucide-react';
+//import OrderTimeline from '../components/OrderTimeline';
+import { useState } from 'react';
+//import { generateReceipt } from '../utils/generateReceipt';
 
 export default function OrderConfirmationPage() {
   const { state } = useLocation();
@@ -13,6 +16,14 @@ export default function OrderConfirmationPage() {
 
   const deliveryDate = new Date(order.deliveryDate);
   const formatted = deliveryDate.toLocaleDateString('en-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+  setDownloading(true);
+  await generateReceipt(order);
+  setDownloading(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
@@ -92,18 +103,7 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Order Timeline */}
-            {/*<OrderTimeline status={order.status} />*/}
-            {/* Order progress */}
-            <div className="flex items-center justify-center gap-2 mb-8">
-              {['Pending', 'Preparing', 'Delivered', 'Paid'].map((step, idx) => (
-                <div key={step} className="flex items-center">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-brand-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                    {idx + 1}
-                  </div>
-                  {idx < 3 && <div className="w-6 h-0.5 bg-gray-200" />}
-                </div>
-              ))}
-            </div>
+            {/*<OrderTimeline status={order.status} horizontal />*/}
           </div>
 
           {/* RIGHT COLUMN */}
@@ -146,12 +146,19 @@ export default function OrderConfirmationPage() {
               <Link to="/dashboard/orders" className="btn-primary flex items-center justify-center gap-2">
                 <Package className="w-4 h-4" /> Track Order
               </Link>
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white 		      font-semibold transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                {downloading ? 'Generating PDF...' : 'Download Receipt'}
+              </button>
               <Link to="/boxes" className="btn-secondary text-center">
                 Continue Shopping
               </Link>
             </div>
           </div>
-
         </div>
       </div>
     </div>
