@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,8 @@ export default function CheckoutPage() {
     timeSlot: '', 
   });
   const [errors, setErrors] = useState({ street: '', zip: '', phone: '',timeSlot: '', deliveryDate: '' });
+
+  const orderPlaced = useRef(false);
 
   const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
   const timeSlots = ['9AM–12PM', '12PM–3PM', '3PM–6PM', '6PM–9PM'];
@@ -89,20 +91,25 @@ export default function CheckoutPage() {
         status: 'pending',
         createdAt: new Date().toISOString(),
         items: cart.items,
+        deliveryAddress: { street: form.street, city: form.city, zip: form.zip, phone: form.phone },
+        customerName: user?.name,
+        customerEmail: user?.email,
       };
+      
       const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
       localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));
+
       orderPlaced.current = true;
       navigate('/order-confirmation', { state: { order: mockOrder } });
-      try{  await clearCart();  } catch(_){}
+      try{ await clearCart(); } catch(_){}
     } catch (err) {
       toast.error('Order failed');
     } finally {
       setSubmitting(false);
     }
   };
-  
-  if (!cart.items?.length && !orderPlaced.current){
+
+  if (!cart.items?.length && !orderPlaced.current) {
     navigate('/cart'); return null;
   }
 
