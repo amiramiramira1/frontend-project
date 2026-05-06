@@ -6,7 +6,8 @@ import { promoCodes, sampleMeals } from '../data/mockData';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
 import { useRef } from 'react';
-
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart();
@@ -19,10 +20,14 @@ export default function CheckoutPage() {
     city: user?.addresses?.[0]?.city || 'Cairo',
     zip: user?.addresses?.[0]?.zip || '',
     phone: user?.addresses?.[0]?.phone || '',
+    deliveryDate: '',
+    timeSlot: '', 
   });
-  const [errors, setErrors] = useState({ zip: '', phone: '' });
+  const [errors, setErrors] = useState({ street: '', zip: '', phone: '',timeSlot: '', deliveryDate: '' });
 
   const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
+  const timeSlots = ['9AM–12PM', '12PM–3PM', '3PM–6PM', '6PM–9PM'];
+
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [promoError, setPromoError] = useState('');
@@ -44,22 +49,29 @@ export default function CheckoutPage() {
   };
 
   const validate = () => {
-    const newErrors = { zip: '', phone: '' };
+    const newErrors = { street: '', zip: '', phone: '', timeSlot: '', deliveryDate: '' };
+    if (!form.street) {
+    newErrors.street = 'Street address is required';
+    }
     if (form.zip && !/^\d{5}$/.test(form.zip)) {
       newErrors.zip = 'ZIP code must be exactly 5 digits';
     }
     if (!/^01[0125][0-9]{8}$/.test(form.phone)) {
       newErrors.phone = 'Enter a valid Egyptian number (e.g. 01012345678)';
     }
+    if (!form.timeSlot) {
+    newErrors.timeSlot = 'Please select a time slot';
+    }
+    if (!form.deliveryDate) {
+      newErrors.deliveryDate = 'Please select a delivery date';
+    }
     setErrors(newErrors);
-    return !newErrors.zip && !newErrors.phone;
+    return !newErrors.zip && !newErrors.phone && !newErrors.timeSlot && !newErrors.deliveryDate;
   };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.street || !form.city || !form.phone) {
-      toast.error('Please fill all required fields'); return;
-    }
     if (!validate()) return;
     setSubmitting(true);
     try {
@@ -71,7 +83,8 @@ export default function CheckoutPage() {
         totalPrice: discountedTotal,         
         originalPrice: cart.cartTotal,        
         appliedPromo: appliedPromo || null,   
-        deliveryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+        deliveryDate: form.deliveryDate || new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+        timeSlot: form.timeSlot,
         paymentMethod: 'cash_on_delivery',
         status: 'pending',
         createdAt: new Date().toISOString(),
@@ -113,7 +126,11 @@ export default function CheckoutPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Street Address *</label>
-                    <input required value={form.street} onChange={e => setForm(p => ({ ...p, street: e.target.value }))} className="input-field" placeholder="15 Tahrir Square, Apt 3" />
+                    <input value={form.street} onChange={e => {
+                      setForm(p => ({ ...p, street: e.target.value }));
+                      setErrors(p => ({ ...p, street: '' }));
+                    }} className={`input-field ${errors.street ? 'border-red-500 focus:ring-red-400' : ''}`} placeholder="15 Tahrir Square, Apt 3" />
+                    {errors.street && <p className="text-red-500 text-xs mt-1">{errors.street}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">City *</label>
@@ -138,7 +155,6 @@ export default function CheckoutPage() {
                     <div className="relative">
                       <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input 
-                        required 
                         value={form.phone} 
                         onChange={e => {
                           setForm(p => ({ ...p, phone: e.target.value }));
@@ -150,6 +166,51 @@ export default function CheckoutPage() {
                     {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                   </div>
                 </div>
+              </div>
+
+              {/* Delivery scheduling section */}
+              <div className="card p-6">
+                <h2 className="font-display text-xl font-bold mb-5 flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-brand-500" /> Delivery Schedule
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Preferred Delivery Date *</label>
+                  <DatePicker
+                    selected={form.deliveryDate ? new Date(form.deliveryDate) : null}
+                    onChange={date => setForm(p => ({ ...p, deliveryDate: date.toISOString().split('T')[0] }))}
+                    minDate={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)}
+                    maxDate={new Date(Date.now() + 9 * 24 * 60 * 60 * 1000)}
+                    dateFormat="dd MMMM, yyyy"
+                    placeholderText="Select a delivery date"
+                    className="input-field w-full"
+                  />
+                  {errors.deliveryDate && <p className="text-red-500 text-xs mt-1">{errors.deliveryDate}</p>}
+                  <p className="text-xs text-gray-400 mt-1">Available 3–7 days from today</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Time slot buttons */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Preferred Time Slot *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {timeSlots.map(slot => (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, timeSlot: slot }))}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        form.timeSlot === slot
+                          ? 'border-brand-500 bg-brand-50'
+                          : 'border-gray-200 hover:border-brand-300'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-900 text-sm">{slot}</div>
+                    </button>
+                  ))}
+                </div>
+                {errors.timeSlot && <p className="text-red-500 text-xs mt-1">{errors.timeSlot}</p>}
               </div>
 
               <div className="card p-6">
