@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
 import { useRef } from 'react';
 
+
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart();
   const { user } = useAuth();
