@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart, ArrowRight, Package, Pencil, X, Check } from 'lucide-react';
+import { sampleMeals } from '../data/mockData';
 
 export default function CartPage() {
   const { cart, removeItem, updateItem, loading } = useCart();
