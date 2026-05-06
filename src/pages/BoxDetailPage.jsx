@@ -479,6 +479,34 @@ export default function BoxDetailPage() {
                 Subscribe Weekly
               </button>
 
+              {currentPricing && (
+                <div className="bg-gray-50 rounded-xl p-3 mt-4">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Nutritional Summary</p>
+
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-2">
+                    <Flame className="w-3.5 h-3.5 text-orange-400" />
+                    <span>{currentPricing.totalCalories?.toLocaleString()} total calories</span>
+                  </div>
+
+                  {allTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {allTags.map(tag => (
+                        <span key={tag} className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded-md">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {allergens.length > 0 && (
+                    <div className="text-xs text-orange-600 bg-orange-50 rounded-lg p-2">
+                      ⚠️ Contains: {allergens.join(' · ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
+
               <p className="text-xs text-gray-400 text-center mt-3">Free delivery • Fresh ingredients</p>
             </div>
           </div>

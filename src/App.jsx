@@ -1,3 +1,4 @@
+import ProtectedRoute from './components/ProtectedRoute';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
@@ -7,6 +8,8 @@ import { FavoritesProvider } from './context/FavoritesContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import BoxComparePage from './pages/BoxComparePage';
+
+// Pages
 
 import HomePage from './pages/HomePage';
 import BoxesPage from './pages/BoxesPage';
@@ -18,11 +21,14 @@ import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import SubscribePage from './pages/SubscribePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import DashboardLayout from './pages/dashboard/DashboardLayout';
 import ProfilePage from './pages/dashboard/ProfilePage';
 import OrdersPage from './pages/dashboard/OrdersPage';
 import SubscriptionsPage from './pages/dashboard/SubscriptionsPage';
 import AdminLayout from './pages/admin/AdminLayout';
+import SettingsPage from './pages/dashboard/SettingsPage';
+import EditSubscriptionPage from './pages/dashboard/EditSubscriptionPage';
 
 function AppLayout({ children }) {
   return (
@@ -48,12 +54,35 @@ function AppRoutes() {
       <Route path="/compare" element={<AppLayout><BoxComparePage /></AppLayout>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/dashboard" element={<AppLayout><DashboardLayout /></AppLayout>}>
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+
+      {/* Dashboard */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <AppLayout><DashboardLayout /></AppLayout>
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<ProfilePage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="subscriptions/:id/edit" element={<EditSubscriptionPage />} />
       </Route>
-      <Route path="/admin/*" element={<AdminLayout />} />
+
+      {/* Admin */}
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

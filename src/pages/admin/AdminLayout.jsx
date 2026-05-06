@@ -4,6 +4,7 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { LayoutDashboard, Package, Repeat, Users, ChefHat, BarChart3, RefreshCw } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const statusOptions = ['pending', 'preparing', 'out_for_delivery', 'delivered', 'paid', 'cancelled'];
 
@@ -144,6 +145,66 @@ function AdminUsers() {
   );
 }
 
+function AdminCharts (){
+  const [orders,setOrders] = useState([]);
+
+  useEffect(()=>{
+    const saved = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
+    setOrders(saved);
+  }, []);
+
+  const ordersByStatus = ['pending', 'preparing', 'out_for_delivery', 'delivered', 'paid', 'cancelled']
+  .map(status => ({
+    name: status.replace(/_/g, ' '),
+    count: orders.filter(o => o.status === status).length
+  }));
+
+  const revenueByDate = orders.reduce((acc, order) => {
+  const date = new Date(order.createdAt).toLocaleDateString('en-EG');
+  acc[date] = (acc[date] || 0) + order.totalPrice;
+  return acc;
+  }, {});
+
+  const revenueData = Object.entries(revenueByDate).map(([date, total]) => ({
+  date,
+  total
+  }));
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+
+    {/* Orders by Status */}
+    <div className="card p-5">
+      <h3 className="font-display font-bold text-gray-900 mb-4">Orders by Status</h3>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={ordersByStatus}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+          <Tooltip />
+          <Bar dataKey="count" fill="#f97316" radius={[6, 6, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+
+    {/* Revenue Over Time */}
+      <div className="card p-5">
+        <h3 className="font-display font-bold text-gray-900 mb-4">Revenue Over Time</h3>
+        <ResponsiveContainer width="100%" height={250}>
+          <LineChart data={revenueData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip formatter={(value) => `${value.toLocaleString()} EGP`} />
+            <Line type="monotone" dataKey="total" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+}
+
 const adminNav = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/orders', label: 'Orders', icon: Package },
@@ -185,7 +246,7 @@ export default function AdminLayout() {
 
       <div className="page-container py-8 space-y-8">
         <Routes>
-          <Route index element={<><AdminStats /></>} />
+          <Route index element={<><AdminStats /><AdminCharts /></>} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="subscriptions" element={<AdminSubscriptions />} />
           <Route path="users" element={<AdminUsers />} />

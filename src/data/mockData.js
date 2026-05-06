@@ -261,14 +261,30 @@ export const sampleBoxes = [
 ];
 
 // ---------- HELPER: Calculate custom box price ----------
-export function calculateCustomBoxPrice(mealIds, servingsPerMeal) {
-  const meals = mealIds.map(id => sampleMeals.find(m => m._id === id)).filter(Boolean);
-  const totalPrice = meals.reduce((sum, m) => sum + m.pricePerServing * servingsPerMeal, 0);
-  const totalCalories = meals.reduce((sum, m) => sum + m.caloriesPerServing * servingsPerMeal, 0);
+export function calculateCustomBoxPrice(mealQuantities, servingsPerMeal) {
+  const entries = Object.entries(mealQuantities);
+  const meals = entries
+    .map(([id, qty]) => ({ meal: sampleMeals.find(m => m._id === id), qty }))
+    .filter(({ meal }) => Boolean(meal));
+
+  const totalPrice = meals.reduce(
+    (sum, { meal, qty }) => sum + meal.pricePerServing * servingsPerMeal * qty, 0
+  );
+  const totalCalories = meals.reduce(
+    (sum, { meal, qty }) => sum + meal.caloriesPerServing * servingsPerMeal * qty, 0
+  );
   return {
     totalPrice,
     totalCalories,
-    pricePerServing: meals.length ? totalPrice / meals.length / servingsPerMeal : 0,
-    mealsCount: meals.length,
+    pricePerServing: meals.length
+      ? totalPrice / meals.reduce((s, { qty }) => s + qty, 0) / servingsPerMeal
+      : 0,
+    mealsCount: meals.reduce((s, { qty }) => s + qty, 0),
   };
 }
+
+export const promoCodes = {
+  'SAVE10': { discount: 0.10, label: '10% off' },
+  'SAVE20': { discount: 0.20, label: '20% off' },
+  'WELCOME': { discount: 0.15, label: '15% off' },
+};
