@@ -1,10 +1,11 @@
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { CheckCircle, Package, Truck, Clock, ArrowRight } from 'lucide-react';
+import OrderTimeline from '../components/OrderTimeline';
 
 export default function OrderConfirmationPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const order = state?.order;
+  const { order } = useLocation().state;
 
   if (!order) {
     navigate('/');
@@ -57,16 +58,7 @@ export default function OrderConfirmationPage() {
           </div>
 
           {/* Order progress */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            {['Pending', 'Preparing', 'Delivered', 'Paid'].map((step, idx) => (
-              <div key={step} className="flex items-center">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${idx === 0 ? 'bg-brand-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                  {idx + 1}
-                </div>
-                {idx < 3 && <div className="w-6 h-0.5 bg-gray-200" />}
-              </div>
-            ))}
-          </div>
+          <OrderTimeline status={order.status} />
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Link to="/dashboard/orders" className="btn-primary flex-1 flex items-center justify-center gap-2">
