@@ -5,7 +5,7 @@ import OrderTimeline from '../components/OrderTimeline';
 export default function OrderConfirmationPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const order = state?.order;
+  const { order } = useLocation().state;
 
   if (!order) {
     navigate('/');
