@@ -1,0 +1,11 @@
+# Root
+node_modules/
+.env
+
+# Frontend build output (managed inside frontend/)
+frontend/dist/
+frontend/node_modules/
+
+# Backend
+backend/node_modules/
+backend/.env
