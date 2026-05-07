@@ -1,0 +1,28 @@
+fixes:
+✔️add description to boxes
+✔️add start date to subscription model and make next payment date default to one month from now
+✔️add foreign key user and box to subscription model
+✔️get all subscription by user id (populate)
+✔️get all orders by user id (populate)
+✔️common controller(and route) for buying boxes check type to know create subscription or order only userinputinbody: userid,boxid,address
+✔️get all user information including orders and subscriptions //my idea
+✔️validate email is unique and is email (regular expression)
+✔️try and catch any database operation
+✔️validate all routes with express validator  
+
+
+
+
+
+
+for later: 
+implement user token jws
+
+
+
+my ideas:
+validate especially that ids exists
+test all types of inputs ensure no server crash
+
+
+
