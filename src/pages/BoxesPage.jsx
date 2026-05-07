@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { sampleBoxes } from '../data/mockData';
 import BoxCard from '../components/BoxCard';
-import { Search, X } from 'lucide-react';
+import { Search, X, GitCompareArrows } from 'lucide-react';
 
 const categories = ['All', 'Mediterranean', 'Egyptian', 'Healthy', 'Italian', 'Vegetarian', 'High-Protein'];
 const servingSizes = [1, 2, 4, 6];
@@ -17,6 +17,14 @@ export default function BoxesPage() {
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'All');
   const [selectedServing, setSelectedServing] = useState(null);
   const [selectedDietary, setSelectedDietary] = useState([]);
+  const [compareIds, setCompareIds] = useState([]);
+  const navigate = useNavigate();
+
+  const toggleCompare = (id) => {
+    setCompareIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 3 ? [...prev, id] : prev
+    );
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -193,11 +201,40 @@ export default function BoxesPage() {
           <>
             <p className="text-sm text-gray-500 mb-4">{boxes.length} box{boxes.length !== 1 ? 'es' : ''} found</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {boxes.map(box => <BoxCard key={box._id} box={box} />)}
+              {boxes.map(box => (
+                <div key={box._id} className="relative">
+                  {/* Compare checkbox */}
+                  <label className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={compareIds.includes(box._id)}
+                      onChange={() => toggleCompare(box._id)}
+                      className="accent-brand-500 w-3.5 h-3.5"
+                      disabled={!compareIds.includes(box._id) && compareIds.length >= 3}
+                    />
+                    <span className="text-xs font-medium text-gray-700">Compare</span>
+                  </label>
+                  <BoxCard box={box} />
+                </div>
+              ))}
             </div>
           </>
         )}
       </div>
+
+      {/* Floating Compare Button */}
+      {compareIds.length >= 2 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <button
+            onClick={() => navigate(`/compare?ids=${compareIds.join(',')}`)}
+            className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold px-6 py-3.5 rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95"
+          >
+            <GitCompareArrows className="w-5 h-5" />
+            Compare {compareIds.length} Boxes
+            {compareIds.length < 3 && <span className="text-xs opacity-75 ml-1">(add {3 - compareIds.length} more)</span>}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
