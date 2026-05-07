@@ -18,6 +18,8 @@ import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import SubscribePage from './pages/SubscribePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import DashboardLayout from './pages/dashboard/DashboardLayout';
 import ProfilePage from './pages/dashboard/ProfilePage';
 import OrdersPage from './pages/dashboard/OrdersPage';
@@ -48,6 +50,8 @@ function AppRoutes() {
       <Route path="/subscribe" element={<AppLayout><SubscribePage /></AppLayout>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/dashboard" element={<AppLayout><DashboardLayout /></AppLayout>}>
         <Route index element={<ProfilePage />} />
         <Route path="orders" element={<OrdersPage />} />
