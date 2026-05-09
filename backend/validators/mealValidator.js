@@ -60,6 +60,7 @@ exports.createMealValidator = [
     .optional()
     .trim()
     .isURL().withMessage('Image must be a valid URL'),
+
 ];
 
 // --- Update Meal ---

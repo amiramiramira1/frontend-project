@@ -90,7 +90,6 @@ const createMeal = async (req, res) => {
 const updateMeal = async (req, res) => {
   try {
     const updateData = { ...req.body };
-
     // If ingredients are being updated, recalculate price and calories
     if (req.body.ingredients) {
       const { pricePerServing, caloriesPerServing } = await calculateMealTotals(req.body.ingredients);

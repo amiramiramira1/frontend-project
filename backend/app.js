@@ -10,14 +10,15 @@ const express = require('express');
 const cors = require('cors');
 
 // --- Import Routes ---
-const authRoutes = require('./routes/authRoutes');
-const ingredientRoutes = require('./routes/ingredientRoutes');
-const mealRoutes = require('./routes/mealRoutes');
-const boxRoutes = require('./routes/boxRoutes');
-const orderRoutes = require('./routes/orderRoutes');
+const authRoutes         = require('./routes/authRoutes');
+const ingredientRoutes   = require('./routes/ingredientRoutes');
+const mealRoutes         = require('./routes/mealRoutes');
+const boxRoutes          = require('./routes/boxRoutes');
+const orderRoutes        = require('./routes/orderRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
-const cartRoutes = require('./routes/cartRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+const cartRoutes         = require('./routes/cartRoutes');
+const adminRoutes        = require('./routes/adminRoutes');
+const uploadRoutes       = require('./routes/uploadRoutes');
 
 // --- Create Express App ---
 const app = express();
@@ -27,14 +28,15 @@ app.use(cors());
 app.use(express.json());
 
 // --- API Routes ---
-app.use('/api/auth', authRoutes);
-app.use('/api/ingredients', ingredientRoutes);
-app.use('/api/meals', mealRoutes);
-app.use('/api/boxes', boxRoutes);
-app.use('/api/orders', orderRoutes);
+app.use('/api/auth',          authRoutes);
+app.use('/api/ingredients',   ingredientRoutes);
+app.use('/api/meals',         mealRoutes);
+app.use('/api/boxes',         boxRoutes);
+app.use('/api/orders',        orderRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/cart',          cartRoutes);
+app.use('/api/admin',         adminRoutes);
+app.use('/api/upload',        uploadRoutes);   // Dedicated image upload endpoint
 
 // --- Health Check Route ---
 app.get('/', (req, res) => {

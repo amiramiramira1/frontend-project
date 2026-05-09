@@ -8,7 +8,6 @@ const { createMealValidator, updateMealValidator } = require('../validators/meal
 
 
 
-
 router.route('/')
   .get(getMeals)
   .post(protect, adminOnly, createMealValidator, validate, createMeal);

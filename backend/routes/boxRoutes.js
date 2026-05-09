@@ -13,6 +13,7 @@ const {
   calculateCustomBoxValidator,
 } = require('../validators/boxValidator');
 
+
 router.route('/')
   .get(getBoxes)
   .post(protect, adminOnly, createBoxValidator, validate, createBox);
