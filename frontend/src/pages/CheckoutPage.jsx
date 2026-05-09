@@ -2,14 +2,15 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { promoCodes, sampleMeals } from '../data/mockData';
+import { promoCodes } from '../data/mockData';
+import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { MapPin, Phone, Truck, CreditCard, Package, CheckCircle } from 'lucide-react';
+import { MapPin, Phone, Truck, CreditCard, Package } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 export default function CheckoutPage() {
-  const { cart, clearCart } = useCart();
+  const { cart, fetchCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const orderPlaced = useRef(false);
@@ -74,38 +75,36 @@ export default function CheckoutPage() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      // Mock order creation
-      await new Promise(r => setTimeout(r, 600));
-      const mockOrder = {
-        _id: 'order-' + Date.now(),
-        orderNumber: 'BX-' + Math.floor(100000 + Math.random() * 900000),
-        totalPrice: discountedTotal,         
-        originalPrice: cart.cartTotal,        
-        appliedPromo: appliedPromo || null,   
-        deliveryDate: form.deliveryDate || new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-        timeSlot: form.timeSlot,
-        paymentMethod: 'cash_on_delivery',
-        status: 'pending',
-        createdAt: new Date().toISOString(),
+      // POST /api/cart/checkout → backend creates Order, clears the cart, returns { order }
+      // deliveryAddress maps our form fields to backend User address schema
+      const { data } = await api.post('/cart/checkout', {
         deliveryAddress: {
           street: form.street,
-          city: form.city,
-          zip: form.zip,
-          phone: form.phone,
+          city:   form.city,
+          country: 'Egypt',
+          postalCode: form.zip,
         },
-        customerName: user?.name,
-        customerEmail: user?.email,
-        items: cart.items,
-      };
-      
-      const existing = JSON.parse(localStorage.getItem('boxify_orders') || '[]');
-      localStorage.setItem('boxify_orders', JSON.stringify([mockOrder, ...existing]));
+      });
+
+      // Sync cart state (backend cleared it, frontend still shows old items)
+      await fetchCart();
 
       orderPlaced.current = true;
-      navigate('/order-confirmation', { state: { order: mockOrder } });
-      try{ await clearCart(); } catch(_){}
+      // Pass the real order + promo info to confirmation page
+      navigate('/order-confirmation', {
+        state: {
+          order: {
+            ...data.order,
+            appliedPromo: appliedPromo || null,
+            originalPrice: cart.cartTotal,
+            discountedTotal,
+            timeSlot: form.timeSlot,
+            phone: form.phone,
+          }
+        }
+      });
     } catch (err) {
-      toast.error('Order failed');
+      toast.error(err.response?.data?.message || 'Order failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -256,8 +255,12 @@ export default function CheckoutPage() {
                 <div className="space-y-2 text-sm text-gray-600 mb-4">
                     {cart.items.map(item => (
                       <div key={item._id} className="flex justify-between">
-                        <span className="truncate pr-2">{item.type === 'pre-made-box' ? item.boxName : 'Custom Box'} ×{item.quantity || 1}</span>
-                        <span className="font-medium text-gray-900">{item.totalPrice?.toLocaleString()} EGP</span>
+                        {/* item.box.name replaces item.boxName */}
+                        <span className="truncate pr-2">{item.box?.name || 'Meal Box'} ×{item.quantity || 1}</span>
+                        {/* pricePerItem × quantity replaces item.totalPrice */}
+                        <span className="font-medium text-gray-900">
+                          {((item.pricePerItem || 0) * (item.quantity || 1)).toLocaleString()} EGP
+                        </span>
                       </div>
                     ))}
                   </div>

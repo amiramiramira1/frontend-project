@@ -5,6 +5,7 @@ const {
   getSubscriptionStats,
   getUpcomingDeliveries,
   manuallyGenerateSubscriptionOrder,
+  getAllUsers,
 } = require('../controllers/adminController');
 const { protect } = require('../middleware/authMiddleware');
 const { adminOnly } = require('../middleware/adminMiddleware');
@@ -19,5 +20,6 @@ router.get('/stats', getDashboardStats);
 router.get('/subscriptions/stats', getSubscriptionStats);
 router.get('/subscriptions/upcoming', getUpcomingDeliveries);
 router.post('/subscriptions/generate', generateSubscriptionOrderValidator, validate, manuallyGenerateSubscriptionOrder);
+router.get('/users', getAllUsers);
 
 module.exports = router;

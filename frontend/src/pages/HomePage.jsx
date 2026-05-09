@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Clock, Users, Leaf, Star, ChevronRight, Package, Truck, Shield } from 'lucide-react';
+import { ArrowRight, Clock, Users, Leaf, Star, ChevronRight, Package, Truck } from 'lucide-react';
 import BoxCard from '../components/BoxCard';
 import { useEffect, useState } from 'react';
-import { sampleBoxes } from '../data/mockData';
+import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 
 const features = [
   { icon: Clock, title: 'Save Time', desc: 'Pre-portioned ingredients, no meal planning or grocery shopping needed.' },
@@ -19,14 +20,15 @@ const steps = [
 ];
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [featuredBoxes, setFeaturedBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setTimeout(() => {
-      setFeaturedBoxes(sampleBoxes.filter(b => b.featured).slice(0, 3));
-      setLoading(false);
-    }, 300);
+    // Fetch real boxes from API, take the first 3 as featured
+    api.get('/boxes', { params: { limit: 3 } })
+      .then(({ data }) => setFeaturedBoxes(data.boxes || []))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -163,9 +165,16 @@ export default function HomePage() {
           <h2 className="font-display text-2xl sm:text-4xl md:text-5xl font-black mb-4">Ready to start cooking?</h2>
           <p className="text-base md:text-xl opacity-80 mb-8">Join thousands of families enjoying fresh, home-cooked meals every week.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register" className="bg-white text-brand-600 font-bold px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-md">
-              Get Started Free
-            </Link>
+            {!user && (
+              <Link to="/register" className="bg-white text-brand-600 font-bold px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-md">
+                Get Started Free
+              </Link>
+            )}
+            {user && (
+              <Link to="/dashboard" className="bg-white text-brand-600 font-bold px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-md">
+                Go to Dashboard
+              </Link>
+            )}
             <Link to="/boxes" className="border-2 border-white text-white font-bold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
               Browse Boxes
             </Link>

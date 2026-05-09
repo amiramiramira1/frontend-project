@@ -1,118 +1,103 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { sampleBoxes, sampleMeals } from '../data/mockData';
+import api from '../api/axios';
+import { useAuth } from './AuthContext';
+import toast from 'react-hot-toast';
 
 const CartContext = createContext(null);
 
-let _nextId = Date.now();
-
 export const CartProvider = ({ children }) => {
-
-  const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem('boxify_cart');
-    return saved ? JSON.parse(saved) : { items: [], cartTotal: 0 };
-  });
-
+  const { user } = useAuth(); // CartProvider is inside AuthProvider so this is safe
+  const [cart, setCart] = useState({ items: [], cartTotal: 0 });
   const [loading, setLoading] = useState(false);
 
+  // ── Auto-fetch cart whenever user logs in or out ──────────────────
+  // When user logs in  → fetch their real cart from the DB
+  // When user logs out → reset to empty (axios interceptor already clears token)
   useEffect(() => {
-    localStorage.setItem('boxify_cart', JSON.stringify(cart));
-  }, [cart]);
+    if (user) {
+      fetchCart();
+    } else {
+      setCart({ items: [], cartTotal: 0 });
+    }
+  }, [user]); // Runs every time user object changes
 
-  const recalcTotal = (items) => items.reduce((s, i) => s + (i.totalPrice || 0), 0);
+  // ── GET /api/cart ─────────────────────────────────────────────────
+  // Returns { cart: { items: [...], cartTotal } }
+  // Each item: { _id, box: { _id, name, image, basePrice }, servingSize, quantity, pricePerItem }
+  const fetchCart = async () => {
+    try {
+      const { data } = await api.get('/cart');
+      setCart(data.cart);
+    } catch {
+      // 401 = not logged in, ignore silently
+      setCart({ items: [], cartTotal: 0 });
+    }
+  };
 
+  // ── POST /api/cart/items ──────────────────────────────────────────
+  // Request: { boxId, servingSize, quantity }
+  // Note: frontend uses "servingsPerMeal", backend uses "servingSize" — we map here
   const addToCart = async (payload) => {
     setLoading(true);
     try {
-      let newItem;
-
-      if (payload.type === 'pre-made-box') {
-        // ── Pre-made box: unchanged ──────────────────────────────
-        const box = sampleBoxes.find(b => b._id === payload.boxId);
-        const pricing = box?.pricingOptions?.[payload.servingsPerMeal];
-        newItem = {
-          _id: `cart-item-${_nextId++}`,
-          type: 'pre-made-box',
-          boxId: payload.boxId,
-          boxName: box?.name || 'Meal Box',
-          mealsCount: box?.mealsCount || 0,
-          servingsPerMeal: payload.servingsPerMeal,
-          quantity: 1,
-          totalPrice: pricing?.totalPrice || 0,
-          meals: pricing?.mealDetails || [],
-        };
-
-      } else {
-        // ── Custom box: now supports quantities ──────────────────
-        // payload.mealQuantities = { 'meal-001': 2, 'meal-003': 1 }
-
-        const quantities = payload.mealQuantities || {};
-
-        // Convert { 'meal-001': 2 } → [mealObj, mealObj]
-        // (repeated entries so CartPage can display them individually)
-        const meals = Object.entries(quantities).flatMap(([id, qty]) => {
-          const meal = sampleMeals.find(m => m._id === id);
-          return meal ? Array(qty).fill(meal) : [];
-        });
-
-        // Price = sum of (pricePerServing × servings × qty) for each meal
-        const totalPrice = Object.entries(quantities).reduce((sum, [id, qty]) => {
-          const meal = sampleMeals.find(m => m._id === id);
-          return sum + (meal ? meal.pricePerServing * payload.servingsPerMeal * qty : 0);
-        }, 0);
-
-        newItem = {
-          _id: `cart-item-${_nextId++}`,
-          type: 'custom-box',
-          customBox: { name: payload.name || 'Custom Box' },
-          mealQuantities: quantities,          // store for future edits
-          mealsCount: meals.length,            // total slots (e.g. 2+1 = 3)
-          servingsPerMeal: payload.servingsPerMeal,
-          quantity: 1,
-          totalPrice,
-          meals,                               // flat array for CartPage display
-        };
-      }
-
-      setCart(prev => {
-        const items = [...prev.items, newItem];
-        return { items, cartTotal: recalcTotal(items) };
+      const { data } = await api.post('/cart/items', {
+        boxId:       payload.boxId,
+        servingSize: payload.servingsPerMeal, // map old name → backend name
+        quantity:    payload.quantity || 1,
       });
-      return newItem;
-
+      setCart(data.cart);
+      return data.cart;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to add to cart';
+      toast.error(msg);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
+  // ── PUT /api/cart/items/:itemId ───────────────────────────────────
+  // Request: { quantity } or { servingSize } or both
+  // The backend recalculates pricePerItem if servingSize changes
   const updateItem = async (itemId, updates) => {
-    setCart(prev => {
-      const items = prev.items.map(i => {
-        if (i._id !== itemId) return i;
-        const updated = { ...i, ...updates };
-        if (updates.quantity) {
-          const basePrice = i.totalPrice / (i.quantity || 1);
-          updated.totalPrice = basePrice * updates.quantity;
-        }
-        return updated;
-      });
-      return { items, cartTotal: recalcTotal(items) };
-    });
+    setLoading(true);
+    try {
+      const { data } = await api.put(`/cart/items/${itemId}`, updates);
+      setCart(data.cart);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update cart');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ── DELETE /api/cart/items/:itemId ────────────────────────────────
   const removeItem = async (itemId) => {
-    setCart(prev => {
-      const items = prev.items.filter(i => i._id !== itemId);
-      return { items, cartTotal: recalcTotal(items) };
-    });
+    setLoading(true);
+    try {
+      const { data } = await api.delete(`/cart/items/${itemId}`);
+      setCart(data.cart);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove item');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ── DELETE /api/cart ──────────────────────────────────────────────
   const clearCart = async () => {
-    setCart({ items: [], cartTotal: 0 });
-    localStorage.removeItem('boxify_cart');
+    setLoading(true);
+    try {
+      const { data } = await api.delete('/cart');
+      setCart(data.cart);
+    } catch (err) {
+      toast.error('Failed to clear cart');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fetchCart = async () => {};
-
+  // Total number of items (sum of quantities) — used by Navbar badge
   const itemCount = cart.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0;
 
   return (

@@ -1,77 +1,77 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { sampleBoxes } from '../data/mockData';
+import api from '../api/axios';
 import BoxCard from '../components/BoxCard';
 import { Search, X, GitCompareArrows } from 'lucide-react';
 
-const categories = ['All', 'Mediterranean', 'Egyptian', 'Healthy', 'Italian', 'Vegetarian', 'High-Protein'];
-const servingSizes = [1, 2, 4, 6];
-const dietaryOptions = ['vegetarian', 'vegan', 'high-protein', 'gluten-free'];
+// These match the backend's dietType enum values
+const dietFilters = [
+  { value: 'all',         label: 'All' },
+  { value: 'standard',    label: 'Standard' },
+  { value: 'vegetarian',  label: 'Vegetarian' },
+  { value: 'vegan',       label: 'Vegan' },
+  { value: 'keto',        label: 'Keto' },
+  { value: 'paleo',       label: 'Paleo' },
+  { value: 'mixed',       label: 'Mixed' },
+];
 
 export default function BoxesPage() {
   const [boxes, setBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'All');
-  const [selectedServing, setSelectedServing] = useState(null);
-  const [selectedDietary, setSelectedDietary] = useState([]);
+  const [selectedDiet, setSelectedDiet] = useState('all');
   const [compareIds, setCompareIds] = useState([]);
   const navigate = useNavigate();
 
+  // ── Fetch boxes from the real API ────────────────────────────────
+  // We send the dietType as a query param so the backend does the filtering.
+  // The search filtering happens client-side since the backend doesn't support text search yet.
+  useEffect(() => {
+    const fetchBoxes = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const params = {};
+        if (selectedDiet !== 'all') params.dietType = selectedDiet;
+
+        const { data } = await api.get('/boxes', { params });
+        // Backend returns { boxes: [...], pagination: {...} }
+        setBoxes(data.boxes || []);
+      } catch (err) {
+        setError('Failed to load boxes. Please try again.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBoxes();
+  }, [selectedDiet]); // Re-fetch whenever the diet filter changes
+
+  // ── Client-side search filter ─────────────────────────────────────
+  // Runs on the already-fetched boxes without hitting the API again
+  const filteredBoxes = boxes.filter(box => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      box.name.toLowerCase().includes(q) ||
+      box.description?.toLowerCase().includes(q)
+    );
+  });
+
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedDiet('all');
+  };
+
+  const hasActiveFilters = search || selectedDiet !== 'all';
+
+  // ── Compare selection ─────────────────────────────────────────────
   const toggleCompare = (id) => {
     setCompareIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 3 ? [...prev, id] : prev
-    );
-  };
-
-  useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      let filtered = sampleBoxes;
-
-      if (search) {
-        const q = search.toLowerCase();
-        filtered = filtered.filter(b => {
-          const nameMatch = b.name.toLowerCase().includes(q);
-          const descMatch = q.length >= 3 && b.description.toLowerCase().includes(q);
-          return nameMatch || descMatch;
-        });
-      }
-
-      if (selectedCategory !== 'All') {
-        filtered = filtered.filter(b => b.category === selectedCategory);
-      }
-
-      if (selectedServing) {
-        filtered = filtered.filter(b => b.availableServings?.includes(selectedServing));
-      }
-
-      if (selectedDietary.length > 0) {
-        filtered = filtered.filter(b =>
-          selectedDietary.some(tag => b.dietaryTags?.includes(tag))
-        );
-      }
-
-      setBoxes(filtered);
-      setLoading(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [selectedCategory, search, selectedServing, selectedDietary]);
-
-  const clearAllFilters = () => {
-    setSearch('');
-    setSelectedCategory('All');
-    setSelectedServing(null);
-    setSelectedDietary([]);
-  };
-
-  const hasActiveFilters = search || selectedCategory !== 'All' || selectedServing || selectedDietary.length > 0;
-
-  const toggleDietary = (tag) => {
-    setSelectedDietary(prev =>
-      prev.includes(tag) ? [] : [tag]
     );
   };
 
@@ -80,8 +80,6 @@ export default function BoxesPage() {
       <Helmet>
         <title>All Meal Boxes — Boxify</title>
         <meta name="description" content="Browse all our curated meal boxes. Fresh ingredients delivered weekly across Egypt." />
-        <meta property="og:title" content="All Meal Boxes — Boxify" />
-        <meta property="og:description" content="Browse all our curated meal boxes. Fresh ingredients delivered weekly across Egypt." />
       </Helmet>
 
       {/* Header */}
@@ -105,103 +103,61 @@ export default function BoxesPage() {
           />
         </div>
 
-        {/* Filters */}
-        <div className="space-y-3 mb-4">
-
-          {/* Categories */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5 px-0">Category</p>
-            <div className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1 -mx-4 px-4">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
-                    selectedCategory === cat
-                      ? 'bg-brand-500 text-white shadow-md'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-300'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+        {/* Diet type filter */}
+        <div className="mb-4">
+          <p className="text-xs font-medium text-gray-500 mb-1.5">Diet Type</p>
+          <div className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1 -mx-4 px-4">
+            {dietFilters.map(f => (
+              <button
+                key={f.value}
+                onClick={() => setSelectedDiet(f.value)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
+                  selectedDiet === f.value
+                    ? 'bg-brand-500 text-white shadow-md'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-300'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
-
-          {/* Serving Size */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Serving Size</p>
-            <div className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1 -mx-4 px-4">
-              {servingSizes.map(size => (
-                <button
-                  key={size}
-                  onClick={() => setSelectedServing(selectedServing === size ? null : size)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0 border ${
-                    selectedServing === size
-                      ? 'bg-brand-500 text-white shadow-md'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-300'
-                  }`}
-                >
-                  {size} {size === 1 ? 'Person' : 'People'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Dietary */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Dietary</p>
-            <div className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1 -mx-4 px-4">
-              {dietaryOptions.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => toggleDietary(tag)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all capitalize flex-shrink-0 ${
-                    selectedDietary.includes(tag)
-                      ? 'bg-brand-500 text-white shadow-md'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:border-brand-300'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
         </div>
 
-        {/* Clear Filters */}
+        {/* Clear filters */}
         {hasActiveFilters && (
-          <button
-            onClick={clearAllFilters}
-            className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 mb-4"
-          >
+          <button onClick={clearFilters} className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 mb-4">
             <X className="w-4 h-4" /> Clear all filters
           </button>
         )}
 
+        {/* Error state */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Loading skeleton */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1,2,3,4,5,6].map(i => (
+            {[1, 2, 3, 4, 5, 6].map(i => (
               <div key={i} className="card h-80 animate-pulse" />
             ))}
           </div>
-        ) : boxes.length === 0 ? (
+        ) : filteredBoxes.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="w-8 h-8 text-gray-400" />
             </div>
             <h3 className="text-xl font-display font-semibold text-gray-700 mb-2">No boxes found</h3>
-            <p className="text-gray-400">Try a different search or category</p>
-            <button onClick={clearAllFilters} className="btn-primary mt-4">
-              Clear Filters
-            </button>
+            <p className="text-gray-400">Try a different search or filter</p>
+            <button onClick={clearFilters} className="btn-primary mt-4">Clear Filters</button>
           </div>
         ) : (
           <>
-            <p className="text-sm text-gray-500 mb-4">{boxes.length} box{boxes.length !== 1 ? 'es' : ''} found</p>
+            <p className="text-sm text-gray-500 mb-4">{filteredBoxes.length} box{filteredBoxes.length !== 1 ? 'es' : ''} found</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {boxes.map(box => (
+              {filteredBoxes.map(box => (
                 <div key={box._id} className="relative">
                   {/* Compare checkbox */}
                   <label className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm cursor-pointer select-none">
@@ -224,7 +180,7 @@ export default function BoxesPage() {
 
       {/* Floating Compare Button */}
       {compareIds.length >= 2 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
           <button
             onClick={() => navigate(`/compare?ids=${compareIds.join(',')}`)}
             className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold px-6 py-3.5 rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95"

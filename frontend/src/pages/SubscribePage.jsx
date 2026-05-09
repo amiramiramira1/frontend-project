@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Calendar, Repeat, Users, CheckCircle } from 'lucide-react';
+import { Repeat, CheckCircle } from 'lucide-react';
 
 const days = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday'];
 const frequencies = [{ value: 'weekly', label: 'Weekly', desc: 'Every week' }, { value: 'monthly', label: 'Monthly', desc: 'Every month' }];
@@ -28,32 +29,22 @@ export default function SubscribePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!boxId) { toast.error('No box selected'); return; }
     setLoading(true);
     try {
-      await new Promise(r => setTimeout(r, 500));
-      const mockSub = {
-        _id: 'sub-' + Date.now(),
-        boxType: type,
-        boxName: name,
+      // POST /api/subscriptions → { boxId, servingSize, frequency }
+      // The backend creates the subscription and sets nextDeliveryDate automatically
+      // Note: deliveryDay is a UI preference not stored in the backend model
+      await api.post('/subscriptions', {
+        boxId,
+        servingSize: servings,  // map URL param 'servings' → backend field 'servingSize'
         frequency: form.frequency,
-        deliveryDay: form.deliveryDay,
-        servingsPerMeal: servings,
-        mealsPerDelivery: 4,
-        totalDeliveries: form.frequency === 'weekly' ? 4 : 1,
-        fixedPricePerDelivery: 250,
-        status: 'active',
-        nextDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      };
+      });
 
-      const existing = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
-      localStorage.setItem('boxify_subs', JSON.stringify([mockSub, ...existing]));
-
-      sessionStorage.removeItem('editSubId');
-
-      toast.success('Subscription created! First order generated.');
+      toast.success('Subscription created! 🎉');
       navigate('/dashboard/subscriptions');
     } catch (err) {
-      toast.error('Failed to subscribe');
+      toast.error(err.response?.data?.message || 'Failed to subscribe');
     } finally {
       setLoading(false);
     }
