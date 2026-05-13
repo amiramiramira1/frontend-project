@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, NavLink, Routes, Route } from 'react-router-dom';
+import { useNavigate, NavLink, Routes, Route, Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -287,10 +287,12 @@ export default function AdminLayout() {
       <div className="bg-gray-900 text-white">
         <div className="page-container">
           <div className="flex flex-row items-center gap-3 py-7">
-            <div className="w-9 h-9 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
-              <LayoutDashboard className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="font-display text-base font-bold leading-tight">Boxify<br/>Admin</h1>
+            <Link to="/" className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
+              <div className="w-9 h-9 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                <LayoutDashboard className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="font-display text-base font-bold leading-tight">Boxify<br/>Admin</h1>
+            </Link>
             <nav className="ml-2 flex gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden">
               {adminNav.map(({ to, label, icon: Icon, end }) => (
                 <NavLink key={to} to={to} end={end} className={({ isActive }) =>
