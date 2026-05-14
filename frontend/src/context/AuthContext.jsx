@@ -27,9 +27,9 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      persistUser(data, data.token);
-      toast.success(`Welcome back, ${data.name}!`);
-      return data;
+      persistUser(data.user, data.token);          // data.user, not data
+      toast.success(`Welcome back, ${data.user.name}!`);
+      return data.user;
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed';
       toast.error(msg);
@@ -46,9 +46,9 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/register', { name, email, password });
-      persistUser(data, data.token);
-      toast.success(`Welcome to Boxify, ${data.name}!`);
-      return data;
+      persistUser(data.user, data.token);          // data.user, not data
+      toast.success(`Welcome to Boxify, ${data.user.name}!`);
+      return data.user;
     } catch (err) {
       const msg = err.response?.data?.message || 'Registration failed';
       toast.error(msg);
@@ -75,10 +75,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await api.get('/auth/me');
       const token = localStorage.getItem('boxify_token');
-      persistUser(data, token);
-      return data;
+      persistUser(data.user, token);               // data.user, not data
+      return data.user;
     } catch {
-      // Token expired or invalid — log out silently
       logout();
     }
   };
