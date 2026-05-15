@@ -3,8 +3,9 @@ import { useNavigate, NavLink, Routes, Route, Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { LayoutDashboard, Package, Repeat, Users, BarChart3, RefreshCw, CheckCircle, Clock, Truck, XCircle, ChefHat } from 'lucide-react';
+import { LayoutDashboard, Package, Repeat, Users, BarChart3, RefreshCw, CheckCircle, Clock, Truck, XCircle, ChefHat, Boxes } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { sampleMeals } from '../../data/mockData';
 
 // Valid statuses from the Order model enum
 const statusOptions = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'];
@@ -272,7 +273,118 @@ const adminNav = [
   { to: '/admin/orders',       label: 'Orders',        icon: Package },
   { to: '/admin/subscriptions',label: 'Subscriptions', icon: Repeat },
   { to: '/admin/users',        label: 'Users',         icon: Users },
+  { to: '/admin/inventory',     label: 'Inventory',  icon: Boxes },
 ];
+
+// ── AdminInventory ────────────────────────────────────────────────
+// GET /api/admin/meals → { meals: [...] }
+// PATCH /api/admin/meals/:id → { inStock, stockQuantity }
+function AdminInventory() {
+  const [meals, setMeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+  // TODO: Switch to api.get('/meals') when backend adds inStock & stockQuantity to Meal model
+  // api.get('/meals', { params: { limit: 100 } })
+  //   .then(({ data }) => setMeals(data.meals || []))
+  //   .catch(() => toast.error('Failed to load meals'))
+  //   .finally(() => setLoading(false));
+
+  // Option 2 — seed from sampleMeals with inStock & stockQuantity defaults
+  const saved = JSON.parse(localStorage.getItem('boxify_inventory') || '[]');
+  if (saved.length > 0) {
+    setMeals(saved);
+  } else {
+    const seeded = sampleMeals.map(m => ({ ...m, inStock: false, stockQuantity: 0 }));
+    localStorage.setItem('boxify_inventory', JSON.stringify(seeded));
+    setMeals(seeded);
+  }
+  setLoading(false);
+}, []);
+
+const updateMeal = async (id, changes) => {
+  // Optimistic update
+  setMeals(prev => {
+    const updated = prev.map(m => m._id === id ? { ...m, ...changes } : m);
+    // TODO: Replace localStorage with api.put(`/meals/${id}`, changes) when backend is ready
+    // api.put(`/meals/${id}`, changes)
+    localStorage.setItem('boxify_inventory', JSON.stringify(updated));
+    return updated;
+  });
+  toast.success('Meal updated');
+};
+
+  if (loading) return <div className="animate-pulse h-60 bg-gray-100 rounded-2xl" />;
+
+  return (
+    <div>
+      <h2 className="font-display text-xl font-bold mb-4">Inventory ({meals.length} meals)</h2>
+      {meals.length === 0 && <p className="text-gray-400 text-center py-10">No meals found</p>}
+      <div className="space-y-3">
+        {meals.map(meal => (
+          <div key={meal._id} className="card p-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+
+              {/* Meal info */}
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                  {meal.image
+                    ? <img src={meal.image} alt={meal.name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><ChefHat className="w-5 h-5 text-gray-400" /></div>
+                  }
+                </div>
+                <div>
+                  <div className="font-bold text-gray-900">{meal.name}</div>
+                  <div className="text-sm text-gray-500">
+                    {meal.caloriesPerServing} cal · {meal.pricePerServing} EGP/serving
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {meal.dietaryTags?.slice(0, 2).map(tag => (
+                      <span key={tag} className="badge badge-gray text-xs">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center gap-3">
+                {/* Stock quantity input */}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500">Qty</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={meal.stockQuantity || ''}
+                    placeholder="—"
+                    onChange={e => {
+                      const qty = Number(e.target.value);
+                      updateMeal(meal._id, { stockQuantity: qty, inStock: qty > 0 });
+                    }}
+                    className="input-field !w-20 !py-1.5 !px-2 text-sm text-center"
+                  />
+                </div>
+
+                {/* Stock status toggle */}
+                <button
+                  onClick={() => updateMeal(meal._id, { inStock: !meal.inStock })}
+                  className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
+                    meal.inStock
+                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                      : 'bg-red-100 text-red-700 hover:bg-red-200'
+                  }`}
+                >
+                  {meal.inStock ? '✓ In Stock' : '✗ Out of Stock'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 // ── AdminLayout ───────────────────────────────────────────────────
 export default function AdminLayout() {
@@ -312,6 +424,7 @@ export default function AdminLayout() {
           <Route path="orders"        element={<AdminOrders />} />
           <Route path="subscriptions" element={<AdminSubscriptions />} />
           <Route path="users"         element={<AdminUsers />} />
+          <Route path="inventory" element={<AdminInventory />} />
         </Routes>
       </div>
     </div>

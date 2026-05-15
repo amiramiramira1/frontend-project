@@ -52,6 +52,15 @@ const mealSchema = new mongoose.Schema(
       enum: ['gluten', 'dairy', 'nuts', 'eggs', 'soy', 'shellfish', 'fish'],
       default: [],
     },
+  // TODO: Add these fields for Inventory Management feature
+  // inStock: {
+  //   type: Boolean,
+  //   default: true,
+  // },
+  // stockQuantity: {
+  //   type: Number,
+  //   default: 0,
+  // },
   },
   { timestamps: true }
 );
