@@ -1,12 +1,13 @@
+// BuildBoxPage.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
-import { Search, Plus, Minus, ShoppingCart, Flame, Repeat, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Flame, Repeat, Bookmark, BookmarkCheck, Trash2, Sparkles } from 'lucide-react';
+import Recommendation from '../components/Recommendation';
 
-// Backend dietType enum values
 const dietFilters = ['All', 'vegetarian', 'vegan', 'keto', 'paleo', 'standard'];
 const servingOptions = [1, 2, 4, 6];
 const SAVED_BOXES_KEY = 'saved_custom_boxes';
@@ -26,7 +27,7 @@ export default function BuildBoxPage() {
 
   const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState({});   // { mealId: qty }
+  const [selected, setSelected] = useState({});
   const [servings, setServings] = useState(2);
   const [search, setSearch] = useState('');
   const [dietFilter, setDietFilter] = useState(() => localStorage.getItem('preferred_diet') || 'All');
@@ -36,20 +37,39 @@ export default function BuildBoxPage() {
   const [boxName, setBoxName] = useState('My Custom Box');
   const [savedBoxes, setSavedBoxes] = useState(loadSavedBoxes);
   const [saving, setSaving] = useState(false);
+  const [showRecommendation, setShowRecommendation] = useState(false);
 
   useEffect(() => { localStorage.setItem('preferred_diet', dietFilter); }, [dietFilter]);
 
-  // GET /api/meals → { meals: [...], pagination }
-  // Meal fields: _id, name, description, image, dietType, cuisine, pricePerServing, caloriesPerServing, allergens
   useEffect(() => {
     api.get('/meals', { params: { limit: 50 } })
-      .then(({ data }) => setMeals(data.meals || []))
+      .then(({ data }) => {
+        const loadedMeals = data.meals || [];
+        setMeals(loadedMeals);
+
+        // ── FIX: لو في وجبات مقترحة من الـ Recommendation، حطيها ──
+        const pending = localStorage.getItem('pending_recommended_meals');
+        if (pending) {
+          try {
+            const recommendedIds = JSON.parse(pending);
+            const newSelected = {};
+            recommendedIds.forEach(id => {
+              if (loadedMeals.find(m => m._id === id)) {
+                newSelected[id] = 1;
+              }
+            });
+            if (Object.keys(newSelected).length > 0) {
+              setSelected(newSelected);
+              toast.success(`${Object.keys(newSelected).length} وجبات اتضافوا لبوكسك! 🎉`);
+            }
+          } catch {}
+          localStorage.removeItem('pending_recommended_meals');
+        }
+      })
       .catch(() => toast.error('Failed to load meals'))
       .finally(() => setLoading(false));
   }, []);
 
-  // POST /api/boxes/custom/calculate whenever selection or servings changes
-  // Converts { mealId: qty } → flat array [mealId, mealId, ...] for the backend
   useEffect(() => {
     if (Object.keys(selected).length === 0) { setPriceInfo(null); return; }
     const timer = setTimeout(async () => {
@@ -57,7 +77,6 @@ export default function BuildBoxPage() {
       try {
         const mealIds = Object.entries(selected).flatMap(([id, qty]) => Array(qty).fill(id));
         const { data } = await api.post('/boxes/custom/calculate', { mealIds, servingSize: servings });
-        // data.preview: { priceForServingSize, totalCalories, allergens }
         setPriceInfo({
           totalPrice:    data.preview.priceForServingSize,
           totalCalories: data.preview.totalCalories,
@@ -89,15 +108,12 @@ export default function BuildBoxPage() {
     });
   };
 
-  // dietType replaces dietaryTags for filtering
   const filtered = meals.filter(m => {
     const matchSearch = !search || m.name.toLowerCase().includes(search.toLowerCase()) || m.cuisine?.toLowerCase().includes(search.toLowerCase());
     const matchDiet   = dietFilter === 'All' || m.dietType === dietFilter;
     return matchSearch && matchDiet;
   });
 
-  // Step 1: POST /api/boxes/custom → creates a real Box document
-  // Step 2: addToCart with the new box's _id
   const handleAddToCart = async () => {
     if (!user) { navigate('/login'); return; }
     if (Object.keys(selected).length === 0) { toast.error('Select at least one meal'); return; }
@@ -105,9 +121,7 @@ export default function BuildBoxPage() {
     try {
       const mealIds = Object.entries(selected).flatMap(([id, qty]) => Array(qty).fill(id));
       const { data: boxData } = await api.post('/boxes/custom', {
-        meals: mealIds,
-        name: boxName,
-        servingSize: servings,
+        meals: mealIds, name: boxName, servingSize: servings,
       });
       await addToCart({ boxId: boxData.box._id, servingsPerMeal: servings, quantity: 1 });
       toast.success('Custom box added to cart!');
@@ -117,13 +131,11 @@ export default function BuildBoxPage() {
     } finally { setAdding(false); }
   };
 
-  const mealCount      = Object.values(selected).reduce((a, b) => a + b, 0);
-  const selectedMeals  = meals.filter(m => selected[m._id]);
-  // dietType is a single string per meal, not an array
-  const allTags        = [...new Set(selectedMeals.map(m => m.dietType).filter(Boolean))];
-  const allAllergens   = priceInfo?.allergens || [...new Set(selectedMeals.flatMap(m => m.allergens || []))];
+  const mealCount     = Object.values(selected).reduce((a, b) => a + b, 0);
+  const selectedMeals = meals.filter(m => selected[m._id]);
+  const allTags       = [...new Set(selectedMeals.map(m => m.dietType).filter(Boolean))];
+  const allAllergens  = priceInfo?.allergens || [...new Set(selectedMeals.flatMap(m => m.allergens || []))];
 
-  // Suggestions: meals with same dietType as the last selected meal
   const lastSelectedId = Object.keys(selected).slice(-1)[0];
   const lastSelected   = lastSelectedId ? meals.find(m => m._id === lastSelectedId) : null;
   const suggestions    = lastSelected
@@ -164,10 +176,38 @@ export default function BuildBoxPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* ── FIX: Recommendation مرة واحدة بس ── */}
+      {showRecommendation && (
+        <Recommendation
+          onClose={() => setShowRecommendation(false)}
+          mode="build"
+          onMealsSelected={(suggestedMeals) => {
+            const newSelected = {};
+            suggestedMeals.forEach(m => { if (m._id) newSelected[m._id] = 1; });
+            setSelected(newSelected);
+            setShowRecommendation(false);
+            toast.success(`${suggestedMeals.length} وجبات اتضافوا لبوكسك! 🎉`);
+          }}
+        />
+      )}
+
       <div className="bg-white border-b border-gray-100">
         <div className="page-container py-10">
-          <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">Build Your Box</h1>
-          <p className="text-gray-500">Pick any meals you love. We'll portion everything fresh.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">Build Your Box</h1>
+              <p className="text-gray-500">Pick any meals you love. We'll portion everything fresh.</p>
+            </div>
+            <button
+              onClick={() => setShowRecommendation(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg hover:scale-105"
+              style={{ background: 'linear-gradient(135deg, #1b5e20, #43a047)' }}
+            >
+              <Sparkles className="w-4 h-4" />
+              🤖 ابني بوكسك الذكي
+            </button>
+          </div>
         </div>
       </div>
 
@@ -208,9 +248,7 @@ export default function BuildBoxPage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Meals list */}
           <div className="lg:col-span-2">
-            {/* Search + Diet filter */}
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -226,7 +264,6 @@ export default function BuildBoxPage() {
               </div>
             </div>
 
-            {/* Meal cards */}
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[1,2,3,4].map(i => <div key={i} className="card h-40 animate-pulse" />)}
@@ -284,7 +321,6 @@ export default function BuildBoxPage() {
               </div>
             )}
 
-            {/* Suggestions */}
             {suggestions.length > 0 && (
               <div className="mt-6">
                 <p className="text-sm font-medium text-gray-500 mb-3">✨ You might also like</p>
@@ -319,7 +355,6 @@ export default function BuildBoxPage() {
             )}
           </div>
 
-          {/* Right: Sidebar */}
           <div className="lg:col-span-1">
             <div className="card p-6 sticky top-24">
               <h2 className="font-display text-xl font-bold mb-4">Your Custom Box</h2>

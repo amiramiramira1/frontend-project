@@ -19,6 +19,7 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const cartRoutes         = require('./routes/cartRoutes');
 const adminRoutes        = require('./routes/adminRoutes');
 const uploadRoutes       = require('./routes/uploadRoutes');
+const chatbotRoute       = require('./chatbot');
 
 // --- Create Express App ---
 const app = express();
@@ -36,7 +37,8 @@ app.use('/api/orders',        orderRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/cart',          cartRoutes);
 app.use('/api/admin',         adminRoutes);
-app.use('/api/upload',        uploadRoutes);   // Dedicated image upload endpoint
+app.use('/api/upload',        uploadRoutes);
+app.use('/api/chatbot',       chatbotRoute);
 
 // --- Health Check Route ---
 app.get('/', (req, res) => {

@@ -1,3 +1,8 @@
 node_modules/
 .env
 *.txt
+
+ai-service/.venv/
+ai-service/.env
+
+__pycache__/

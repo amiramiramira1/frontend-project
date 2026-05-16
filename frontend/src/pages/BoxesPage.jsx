@@ -3,17 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import api from '../api/axios';
 import BoxCard from '../components/BoxCard';
-import { Search, X, GitCompareArrows } from 'lucide-react';
+import Recommendation from '../components/Recommendation';
+import { Search, X, GitCompareArrows, Sparkles } from 'lucide-react';
 
-// These match the backend's dietType enum values
 const dietFilters = [
-  { value: 'all',         label: 'All' },
-  { value: 'standard',    label: 'Standard' },
-  { value: 'vegetarian',  label: 'Vegetarian' },
-  { value: 'vegan',       label: 'Vegan' },
-  { value: 'keto',        label: 'Keto' },
-  { value: 'paleo',       label: 'Paleo' },
-  { value: 'mixed',       label: 'Mixed' },
+  { value: 'all',        label: 'All' },
+  { value: 'standard',   label: 'Standard' },
+  { value: 'vegetarian', label: 'Vegetarian' },
+  { value: 'vegan',      label: 'Vegan' },
+  { value: 'keto',       label: 'Keto' },
+  { value: 'paleo',      label: 'Paleo' },
+  { value: 'mixed',      label: 'Mixed' },
 ];
 
 export default function BoxesPage() {
@@ -23,11 +23,9 @@ export default function BoxesPage() {
   const [search, setSearch] = useState('');
   const [selectedDiet, setSelectedDiet] = useState('all');
   const [compareIds, setCompareIds] = useState([]);
+  const [showRecommendation, setShowRecommendation] = useState(false);
   const navigate = useNavigate();
 
-  // ── Fetch boxes from the real API ────────────────────────────────
-  // We send the dietType as a query param so the backend does the filtering.
-  // The search filtering happens client-side since the backend doesn't support text search yet.
   useEffect(() => {
     const fetchBoxes = async () => {
       setLoading(true);
@@ -35,9 +33,7 @@ export default function BoxesPage() {
       try {
         const params = {};
         if (selectedDiet !== 'all') params.dietType = selectedDiet;
-
         const { data } = await api.get('/boxes', { params });
-        // Backend returns { boxes: [...], pagination: {...} }
         setBoxes(data.boxes || []);
       } catch (err) {
         setError('Failed to load boxes. Please try again.');
@@ -46,12 +42,9 @@ export default function BoxesPage() {
         setLoading(false);
       }
     };
-
     fetchBoxes();
-  }, [selectedDiet]); // Re-fetch whenever the diet filter changes
+  }, [selectedDiet]);
 
-  // ── Client-side search filter ─────────────────────────────────────
-  // Runs on the already-fetched boxes without hitting the API again
   const filteredBoxes = boxes.filter(box => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -68,10 +61,11 @@ export default function BoxesPage() {
 
   const hasActiveFilters = search || selectedDiet !== 'all';
 
-  // ── Compare selection ─────────────────────────────────────────────
   const toggleCompare = (id) => {
     setCompareIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 3 ? [...prev, id] : prev
+      prev.includes(id)
+        ? prev.filter(x => x !== id)
+        : prev.length < 3 ? [...prev, id] : prev
     );
   };
 
@@ -82,11 +76,44 @@ export default function BoxesPage() {
         <meta name="description" content="Browse all our curated meal boxes. Fresh ingredients delivered weekly across Egypt." />
       </Helmet>
 
+      {/* Recommendation Panel */}
+      {showRecommendation && (
+        <Recommendation
+          onClose={() => setShowRecommendation(false)}
+          mode="boxes"
+        />
+      )}
+
+      {/* Overlay */}
+      {showRecommendation && (
+        <div
+          onClick={() => setShowRecommendation(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            zIndex: 999
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-white border-b border-gray-100">
         <div className="page-container py-6">
-          <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">Meal Boxes</h1>
-          <p className="text-gray-500">Curated collections of fresh, pre-portioned ingredients</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">Meal Boxes</h1>
+              <p className="text-gray-500">Curated collections of fresh, pre-portioned ingredients</p>
+            </div>
+            {/* زرار الـ AI Recommendation */}
+            <button
+              onClick={() => setShowRecommendation(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg hover:scale-105 w-fit"
+              style={{ background: 'linear-gradient(135deg, #1b5e20, #43a047)' }}
+            >
+              <Sparkles className="w-4 h-4" />
+              🤖 لاقيلي بوكس
+            </button>
+          </div>
         </div>
       </div>
 
@@ -130,17 +157,17 @@ export default function BoxesPage() {
           </button>
         )}
 
-        {/* Error state */}
+        {/* Error */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
             {error}
           </div>
         )}
 
-        {/* Loading skeleton */}
+        {/* Loading */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map(i => (
+            {[1,2,3,4,5,6].map(i => (
               <div key={i} className="card h-80 animate-pulse" />
             ))}
           </div>
@@ -155,11 +182,12 @@ export default function BoxesPage() {
           </div>
         ) : (
           <>
-            <p className="text-sm text-gray-500 mb-4">{filteredBoxes.length} box{filteredBoxes.length !== 1 ? 'es' : ''} found</p>
+            <p className="text-sm text-gray-500 mb-4">
+              {filteredBoxes.length} box{filteredBoxes.length !== 1 ? 'es' : ''} found
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBoxes.map(box => (
                 <div key={box._id} className="relative">
-                  {/* Compare checkbox */}
                   <label className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -187,7 +215,9 @@ export default function BoxesPage() {
           >
             <GitCompareArrows className="w-5 h-5" />
             Compare {compareIds.length} Boxes
-            {compareIds.length < 3 && <span className="text-xs opacity-75 ml-1">(add {3 - compareIds.length} more)</span>}
+            {compareIds.length < 3 && (
+              <span className="text-xs opacity-75 ml-1">(add {3 - compareIds.length} more)</span>
+            )}
           </button>
         </div>
       )}

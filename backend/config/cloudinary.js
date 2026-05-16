@@ -1,38 +1,42 @@
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
+const { Readable } = require('stream');
 
-// Configure Cloudinary with your credentials from .env
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Configure where and how files are stored on Cloudinary
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'boxify', // All uploads go into a "boxify" folder on Cloudinary
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    transformation: [{ width: 800, height: 600, crop: 'limit' }], // Resize on upload
-  },
-});
+// Store files in memory temporarily
+const storage = multer.memoryStorage();
 
-// File filter — reject anything that isn't an image
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image/')) {
-    cb(null, true); // Accept the file
+    cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed'), false); // Reject
+    cb(new Error('Only image files are allowed'), false);
   }
 };
 
-// Create the multer upload middleware
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // Max 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-module.exports = { upload, cloudinary };
+// Helper to upload buffer to Cloudinary
+const uploadToCloudinary = (buffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'boxify', transformation: [{ width: 800, height: 600, crop: 'limit' }] },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    Readable.from(buffer).pipe(stream);
+  });
+};
+
+module.exports = { upload, cloudinary, uploadToCloudinary };
