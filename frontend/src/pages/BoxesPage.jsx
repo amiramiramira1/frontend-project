@@ -4,19 +4,21 @@ import { Helmet } from 'react-helmet-async';
 import api from '../api/axios';
 import BoxCard from '../components/BoxCard';
 import { Search, X, GitCompareArrows } from 'lucide-react';
-
-// These match the backend's dietType enum values
-const dietFilters = [
-  { value: 'all',         label: 'All' },
-  { value: 'standard',    label: 'Standard' },
-  { value: 'vegetarian',  label: 'Vegetarian' },
-  { value: 'vegan',       label: 'Vegan' },
-  { value: 'keto',        label: 'Keto' },
-  { value: 'paleo',       label: 'Paleo' },
-  { value: 'mixed',       label: 'Mixed' },
-];
+import { useTranslation } from 'react-i18next';
 
 export default function BoxesPage() {
+  const { t } = useTranslation();
+
+  const dietFilters = [
+    { value: 'all',         label: t('boxes.dietAll') },
+    { value: 'standard',    label: t('boxes.dietStandard') },
+    { value: 'vegetarian',  label: t('boxes.dietVegetarian') },
+    { value: 'vegan',       label: t('boxes.dietVegan') },
+    { value: 'keto',        label: t('boxes.dietKeto') },
+    { value: 'paleo',       label: t('boxes.dietPaleo') },
+    { value: 'mixed',       label: t('boxes.dietMixed') },
+  ];
+
   const [boxes, setBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,9 +27,6 @@ export default function BoxesPage() {
   const [compareIds, setCompareIds] = useState([]);
   const navigate = useNavigate();
 
-  // ── Fetch boxes from the real API ────────────────────────────────
-  // We send the dietType as a query param so the backend does the filtering.
-  // The search filtering happens client-side since the backend doesn't support text search yet.
   useEffect(() => {
     const fetchBoxes = async () => {
       setLoading(true);
@@ -35,23 +34,18 @@ export default function BoxesPage() {
       try {
         const params = {};
         if (selectedDiet !== 'all') params.dietType = selectedDiet;
-
         const { data } = await api.get('/boxes', { params });
-        // Backend returns { boxes: [...], pagination: {...} }
         setBoxes(data.boxes || []);
       } catch (err) {
-        setError('Failed to load boxes. Please try again.');
+        setError(t('msg.loadBoxesFailed'));
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchBoxes();
-  }, [selectedDiet]); // Re-fetch whenever the diet filter changes
+  }, [selectedDiet]);
 
-  // ── Client-side search filter ─────────────────────────────────────
-  // Runs on the already-fetched boxes without hitting the API again
   const filteredBoxes = boxes.filter(box => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -68,7 +62,6 @@ export default function BoxesPage() {
 
   const hasActiveFilters = search || selectedDiet !== 'all';
 
-  // ── Compare selection ─────────────────────────────────────────────
   const toggleCompare = (id) => {
     setCompareIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 3 ? [...prev, id] : prev
@@ -85,8 +78,8 @@ export default function BoxesPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-100">
         <div className="page-container py-6">
-          <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">Meal Boxes</h1>
-          <p className="text-gray-500">Curated collections of fresh, pre-portioned ingredients</p>
+          <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">{t('boxes.pageTitle')}</h1>
+          <p className="text-gray-500">{t('boxes.pageSubtitle')}</p>
         </div>
       </div>
 
@@ -96,7 +89,7 @@ export default function BoxesPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search boxes..."
+            placeholder={t('boxes.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="input-field pl-11"
@@ -105,7 +98,7 @@ export default function BoxesPage() {
 
         {/* Diet type filter */}
         <div className="mb-4">
-          <p className="text-xs font-medium text-gray-500 mb-1.5">Diet Type</p>
+          <p className="text-xs font-medium text-gray-500 mb-1.5">{t('boxes.dietType')}</p>
           <div className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1 -mx-4 px-4">
             {dietFilters.map(f => (
               <button
@@ -126,7 +119,7 @@ export default function BoxesPage() {
         {/* Clear filters */}
         {hasActiveFilters && (
           <button onClick={clearFilters} className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 mb-4">
-            <X className="w-4 h-4" /> Clear all filters
+            <X className="w-4 h-4" /> {t('boxes.clearFilters')}
           </button>
         )}
 
@@ -149,13 +142,15 @@ export default function BoxesPage() {
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-xl font-display font-semibold text-gray-700 mb-2">No boxes found</h3>
-            <p className="text-gray-400">Try a different search or filter</p>
-            <button onClick={clearFilters} className="btn-primary mt-4">Clear Filters</button>
+            <h3 className="text-xl font-display font-semibold text-gray-700 mb-2">{t('boxes.noBoxesTitle')}</h3>
+            <p className="text-gray-400">{t('boxes.noBoxesDesc')}</p>
+            <button onClick={clearFilters} className="btn-primary mt-4">{t('boxes.clearFiltersBtn')}</button>
           </div>
         ) : (
           <>
-            <p className="text-sm text-gray-500 mb-4">{filteredBoxes.length} box{filteredBoxes.length !== 1 ? 'es' : ''} found</p>
+            <p className="text-sm text-gray-500 mb-4">
+              {filteredBoxes.length} {filteredBoxes.length !== 1 ? t('boxes.boxesFound') : t('boxes.boxFound')}
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBoxes.map(box => (
                 <div key={box._id} className="relative">
@@ -168,7 +163,7 @@ export default function BoxesPage() {
                       className="accent-brand-500 w-3.5 h-3.5"
                       disabled={!compareIds.includes(box._id) && compareIds.length >= 3}
                     />
-                    <span className="text-xs font-medium text-gray-700">Compare</span>
+                    <span className="text-xs font-medium text-gray-700">{t('boxes.compare')}</span>
                   </label>
                   <BoxCard box={box} />
                 </div>
@@ -186,8 +181,10 @@ export default function BoxesPage() {
             className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold px-6 py-3.5 rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95"
           >
             <GitCompareArrows className="w-5 h-5" />
-            Compare {compareIds.length} Boxes
-            {compareIds.length < 3 && <span className="text-xs opacity-75 ml-1">(add {3 - compareIds.length} more)</span>}
+            {t('boxes.compareBtn')} {compareIds.length}
+            {compareIds.length < 3 && (
+              <span className="text-xs opacity-75 ml-1">({t('boxes.addMore')} {3 - compareIds.length} {t('boxes.more')})</span>
+            )}
           </button>
         </div>
       )}

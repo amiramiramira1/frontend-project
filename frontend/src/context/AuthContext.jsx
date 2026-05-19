@@ -1,19 +1,17 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import i18next from 'i18next';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  // On page load, try to restore the user from localStorage
-  // This keeps the user logged in after a browser refresh
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('boxify_user');
     return stored ? JSON.parse(stored) : null;
   });
   const [loading, setLoading] = useState(false);
 
-  // ── Helper: save user + token to state AND localStorage ──────────
   const persistUser = (userData, token) => {
     localStorage.setItem('boxify_token', token);
     localStorage.setItem('boxify_user', JSON.stringify(userData));
@@ -21,17 +19,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── LOGIN ─────────────────────────────────────────────────────────
-  // Calls POST /api/auth/login
-  // Backend returns: { _id, name, email, role, token }
   const login = async (email, password) => {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      persistUser(data.user, data.token);          // data.user, not data
-      toast.success(`Welcome back, ${data.user.name}!`);
+      persistUser(data.user, data.token);
+      toast.success(i18next.t('msg.welcomeBack', { name: data.user.name }));
       return data.user;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Login failed';
+      const msg = err.response?.data?.message || i18next.t('msg.loginFailed');
       toast.error(msg);
       throw err;
     } finally {
@@ -40,17 +36,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── REGISTER ──────────────────────────────────────────────────────
-  // Calls POST /api/auth/register
-  // Backend returns: { _id, name, email, role, token }
   const register = async (name, email, password) => {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/register', { name, email, password });
-      persistUser(data.user, data.token);          // data.user, not data
-      toast.success(`Welcome to Boxify, ${data.user.name}!`);
+      persistUser(data.user, data.token);
+      toast.success(i18next.t('msg.welcomeNew', { name: data.user.name }));
       return data.user;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Registration failed';
+      const msg = err.response?.data?.message || i18next.t('msg.registrationFailed');
       toast.error(msg);
       throw err;
     } finally {
@@ -59,23 +53,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── LOGOUT ───────────────────────────────────────────────────────
-  // No backend call needed — just clear the token from localStorage
-  // Next request will get a 401 and the axios interceptor will redirect
   const logout = () => {
     localStorage.removeItem('boxify_token');
     localStorage.removeItem('boxify_user');
     setUser(null);
-    toast.success('Logged out successfully');
+    toast.success(i18next.t('msg.loggedOut'));
   };
 
   // ── REFRESH USER ─────────────────────────────────────────────────
-  // Calls GET /api/auth/me to get fresh user data from the database
-  // Useful after updating profile so the navbar shows the new name
   const refreshUser = async () => {
     try {
       const { data } = await api.get('/auth/me');
       const token = localStorage.getItem('boxify_token');
-      persistUser(data.user, token);               // data.user, not data
+      persistUser(data.user, token);
       return data.user;
     } catch {
       logout();
@@ -83,17 +73,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── UPDATE PROFILE ───────────────────────────────────────────────
-  // Calls PUT /api/auth/profile
   const updateProfile = async (updates) => {
     setLoading(true);
     try {
       const { data } = await api.put('/auth/profile', updates);
       const token = localStorage.getItem('boxify_token');
       persistUser(data, token);
-      toast.success('Profile updated!');
+      toast.success(i18next.t('msg.profileUpdated'));
       return data;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Update failed';
+      const msg = err.response?.data?.message || i18next.t('msg.updateFailed');
       toast.error(msg);
       throw err;
     } finally {
@@ -102,14 +91,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── CHANGE PASSWORD ──────────────────────────────────────────────
-  // Calls PUT /api/auth/change-password
   const changePassword = async (currentPassword, newPassword) => {
     setLoading(true);
     try {
       await api.put('/auth/change-password', { currentPassword, newPassword });
-      toast.success('Password changed successfully!');
+      toast.success(i18next.t('msg.passwordChanged'));
     } catch (err) {
-      const msg = err.response?.data?.message || 'Password change failed';
+      const msg = err.response?.data?.message || i18next.t('msg.passwordChangeFailed');
       toast.error(msg);
       throw err;
     } finally {
@@ -117,14 +105,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── OAUTH (still mock — no backend support yet) ───────────────────
+  // ── OAUTH (mock) ──────────────────────────────────────────────────
   const loginWithGoogle = async () => {
     setLoading(true);
     return new Promise((resolve) => {
       setTimeout(() => {
         const mockUser = { _id: 'google-' + Date.now(), name: 'Google User', email: 'google@gmail.com', role: 'customer' };
         persistUser(mockUser, 'google-mock-token-' + Date.now());
-        toast.success('Logged in with Google');
+        toast.success(i18next.t('msg.loggedInGoogle'));
         setLoading(false);
         resolve(mockUser);
       }, 1000);
@@ -137,11 +125,21 @@ export const AuthProvider = ({ children }) => {
       setTimeout(() => {
         const mockUser = { _id: 'facebook-' + Date.now(), name: 'Facebook User', email: 'fb@gmail.com', role: 'customer' };
         persistUser(mockUser, 'facebook-mock-token-' + Date.now());
-        toast.success('Logged in with Facebook');
+        toast.success(i18next.t('msg.loggedInFacebook'));
         setLoading(false);
         resolve(mockUser);
       }, 1000);
     });
+  };
+
+  // ── DELETE ACCOUNT ────────────────────────────────────────────────
+  const deleteAccount = async () => {
+    try {
+      await api.delete('/auth/me');
+    } catch { /* allow even if API fails */ }
+    localStorage.removeItem('boxify_token');
+    localStorage.removeItem('boxify_user');
+    setUser(null);
   };
 
   return (
@@ -157,6 +155,7 @@ export const AuthProvider = ({ children }) => {
       isAdmin: user?.role === 'admin',
       loginWithGoogle,
       loginWithFacebook,
+      deleteAccount,
     }}>
       {children}
     </AuthContext.Provider>

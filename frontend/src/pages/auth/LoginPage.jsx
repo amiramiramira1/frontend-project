@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Package, Eye, EyeOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
   const { login, loginWithGoogle, loginWithFacebook, loading } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ email: '', password: '' });
@@ -18,7 +20,7 @@ export default function LoginPage() {
       const user = await login(form.email, form.password);
       navigate(user.role === 'admin' ? '/admin' : '/');
     } catch (err) {
-      setError('Login failed');
+      setError(t('msg.loginFailed'));
     }
   };
 
@@ -27,7 +29,7 @@ export default function LoginPage() {
       const user = await loginWithGoogle();
       navigate(user.role === 'admin' ? '/admin' : '/');
     } catch {
-      setError('Google login failed');
+      setError(t('msg.googleLoginFailed'));
     }
   };
 
@@ -36,7 +38,7 @@ export default function LoginPage() {
       const user = await loginWithFacebook();
       navigate(user.role === 'admin' ? '/admin' : '/');
     } catch {
-      setError('Facebook login failed');
+      setError(t('msg.facebookLoginFailed'));
     }
   };
 

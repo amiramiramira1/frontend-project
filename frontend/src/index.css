@@ -83,3 +83,38 @@ html { scroll-behavior: smooth; }
 .react-datepicker__current-month {
   font-size: 1rem !important;
 }
+
+/* ── Arabic / RTL Support ───────────────────────────────────────── */
+html.arabic body,
+html.arabic input,
+html.arabic button,
+html.arabic textarea,
+html.arabic select {
+  font-family: 'Noto Sans Arabic', 'Inter', system-ui, sans-serif;
+}
+
+html.arabic h1,
+html.arabic h2,
+html.arabic h3,
+html.arabic h4,
+html.arabic h5,
+html.arabic h6 {
+  font-family: 'Noto Sans Arabic', 'Outfit', system-ui, sans-serif;
+  font-weight: 800;
+}
+
+/* Flip padding sides for RTL nav/menus */
+html[dir="rtl"] .page-container {
+  direction: rtl;
+}
+
+/* Flip absolute-positioned badge counters in RTL */
+html[dir="rtl"] .rtl-flip-start {
+  left: auto;
+  right: -4px;
+}
+
+/* Smooth transition when switching direction */
+html {
+  transition: font-family 0.15s ease;
+}

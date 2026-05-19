@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
+import i18next from 'i18next';
 import toast from 'react-hot-toast';
 import { Repeat, PauseCircle, PlayCircle, XCircle, Calendar, Package, AlertCircle } from 'lucide-react';
 
@@ -16,18 +18,17 @@ const statusColors = {
 
 export default function SubscriptionsPage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [subs, setSubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [cancelId, setCancelId] = useState(null);
 
-  // GET /api/subscriptions/my → { subscriptions: [...] }
-  // sub.box is populated with { _id, name, image, basePrice }
   const fetchSubs = () => {
     api.get('/subscriptions/my')
       .then(({ data }) => setSubs(data.subscriptions || []))
-      .catch(() => setError('Failed to load subscriptions.'))
+      .catch(() => setError(i18next.t('msg.loadSubsFailed')))
       .finally(() => setLoading(false));
   };
 
@@ -36,27 +37,23 @@ export default function SubscriptionsPage() {
     fetchSubs();
   }, [user]);
 
-  // PUT /api/subscriptions/:id/pause
-  // This endpoint TOGGLES: active → paused, paused → active
-  // So it handles both "Pause" and "Resume" — no separate resume endpoint exists
   const handleTogglePause = async (id, currentStatus) => {
     try {
       const { data } = await api.put(`/subscriptions/${id}/pause`);
       toast.success(`Subscription ${data.subscription.status}`);
       fetchSubs();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update subscription');
+      toast.error(err.response?.data?.message || i18next.t('msg.subUpdateFailed'));
     }
   };
 
-  // PUT /api/subscriptions/:id/cancel
   const handleCancel = async (id) => {
     try {
       await api.put(`/subscriptions/${id}/cancel`);
-      toast.success('Subscription cancelled');
+      toast.success(i18next.t('msg.subCancelled'));
       fetchSubs();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to cancel subscription');
+      toast.error(err.response?.data?.message || i18next.t('msg.subCancelFailed'));
     }
     setCancelId(null);
   };
@@ -77,22 +74,20 @@ export default function SubscriptionsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="font-display text-2xl font-bold">My Subscriptions</h2>
-        <Link to="/boxes" className="btn-primary !py-2 !px-4 text-sm">+ New Subscription</Link>
+        <h2 className="font-display text-2xl font-bold">{t('subs.title')}</h2>
+        <Link to="/boxes" className="btn-primary !py-2 !px-4 text-sm">{t('subs.newSub')}</Link>
       </div>
 
       {subs.length === 0 ? (
         <div className="text-center py-14 card">
           <Repeat className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-600 mb-2">No subscriptions yet</h3>
-          <p className="text-gray-400 mb-4">Subscribe to a box for weekly fresh meal delivery!</p>
-          <Link to="/boxes" className="btn-primary">Browse Boxes</Link>
+          <h3 className="text-lg font-semibold text-gray-600 mb-2">{t('subs.noSubsTitle')}</h3>
+          <p className="text-gray-400 mb-4">{t('subs.noSubsDesc')}</p>
+          <Link to="/boxes" className="btn-primary">{t('subs.browseBoxes')}</Link>
         </div>
       ) : (
         <div className="space-y-5">
           {subs.map(sub => {
-            // Compute price from box.basePrice × serving multiplier
-            // sub.box is populated with { _id, name, image, basePrice }
             const pricePerDelivery = sub.box?.basePrice
               ? (sub.box.basePrice * (MULTIPLIERS[sub.servingSize] || 1)).toFixed(0)
               : '—';
@@ -102,7 +97,6 @@ export default function SubscriptionsPage() {
                 <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      {/* sub.box.name replaces sub.boxName */}
                       <h3 className="font-display font-bold text-gray-900">
                         {sub.box?.name || 'Meal Box'}
                       </h3>
@@ -111,15 +105,14 @@ export default function SubscriptionsPage() {
                       </span>
                     </div>
                     <p className="text-sm text-gray-500">
-                      {/* sub.servingSize replaces sub.servingsPerMeal */}
-                      {sub.frequency} · {sub.servingSize} {sub.servingSize === 1 ? 'person' : 'people'}
+                      {sub.frequency} · {sub.servingSize} {sub.servingSize === 1 ? t('subs.person') : t('subs.people')}
                     </p>
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-display font-black text-brand-600">
                       {pricePerDelivery} EGP
                     </div>
-                    <div className="text-xs text-gray-400">per delivery</div>
+                    <div className="text-xs text-gray-400">{t('subs.perDelivery')}</div>
                   </div>
                 </div>
 
@@ -127,7 +120,7 @@ export default function SubscriptionsPage() {
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="bg-gray-50 rounded-xl p-3 text-center">
                     <Calendar className="w-4 h-4 text-brand-500 mx-auto mb-1" />
-                    <div className="text-xs text-gray-500">Next Delivery</div>
+                    <div className="text-xs text-gray-500">{t('subs.nextDelivery')}</div>
                     <div className="text-sm font-semibold">
                       {sub.nextDeliveryDate
                         ? new Date(sub.nextDeliveryDate).toLocaleDateString('en-EG', { month: 'short', day: 'numeric' })
@@ -136,7 +129,7 @@ export default function SubscriptionsPage() {
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3 text-center">
                     <Package className="w-4 h-4 text-brand-500 mx-auto mb-1" />
-                    <div className="text-xs text-gray-500">Meals in Box</div>
+                    <div className="text-xs text-gray-500">{t('subs.mealsInBox')}</div>
                     <div className="text-sm font-semibold">
                       {sub.mealRotation?.length || '—'}
                     </div>
@@ -145,13 +138,12 @@ export default function SubscriptionsPage() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
-                  {/* Pause/Resume — same endpoint (toggle) */}
                   {sub.status === 'active' && (
                     <button
                       onClick={() => handleTogglePause(sub._id, sub.status)}
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors"
                     >
-                      <PauseCircle className="w-4 h-4" /> Pause
+                      <PauseCircle className="w-4 h-4" /> {t('subs.pause')}
                     </button>
                   )}
                   {sub.status === 'paused' && (
@@ -159,7 +151,7 @@ export default function SubscriptionsPage() {
                       onClick={() => handleTogglePause(sub._id, sub.status)}
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-xl transition-colors"
                     >
-                      <PlayCircle className="w-4 h-4" /> Resume
+                      <PlayCircle className="w-4 h-4" /> {t('subs.resume')}
                     </button>
                   )}
                   {sub.status !== 'cancelled' && (
@@ -167,7 +159,7 @@ export default function SubscriptionsPage() {
                       onClick={() => setCancelId(sub._id)}
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
                     >
-                      <XCircle className="w-4 h-4" /> Cancel
+                      <XCircle className="w-4 h-4" /> {t('subs.cancel')}
                     </button>
                   )}
                 </div>
@@ -181,22 +173,20 @@ export default function SubscriptionsPage() {
       {cancelId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="card p-6 max-w-sm w-full">
-            <h3 className="font-display text-lg font-bold text-gray-900 mb-2">Cancel Subscription?</h3>
-            <p className="text-gray-500 text-sm mb-6">
-              This will cancel your subscription. You won't be charged for future deliveries.
-            </p>
+            <h3 className="font-display text-lg font-bold text-gray-900 mb-2">{t('subs.cancelTitle')}</h3>
+            <p className="text-gray-500 text-sm mb-6">{t('subs.cancelDesc')}</p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleCancel(cancelId)}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
               >
-                Yes, Cancel
+                {t('subs.yesCancel')}
               </button>
               <button
                 onClick={() => setCancelId(null)}
                 className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-semibold text-sm transition-colors"
               >
-                Keep Subscription
+                {t('subs.keepSub')}
               </button>
             </div>
           </div>
