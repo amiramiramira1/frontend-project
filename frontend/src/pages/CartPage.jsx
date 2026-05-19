@@ -1,15 +1,17 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
+import i18next from 'i18next';
 import toast from 'react-hot-toast';
 import { Trash2, Plus, Minus, ShoppingCart, ArrowRight, Package } from 'lucide-react';
 
 export default function CartPage() {
   const { cart, removeItem, updateItem, loading } = useCart();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // Guard: must be logged in (cart is per-user on the backend)
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -17,9 +19,9 @@ export default function CartPage() {
           <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <ShoppingCart className="w-8 h-8 text-gray-400" />
           </div>
-          <h2 className="text-2xl font-display font-bold text-gray-800 mb-2">Please sign in</h2>
-          <p className="text-gray-500 mb-6">You need to be logged in to view your cart.</p>
-          <Link to="/login" className="btn-primary">Sign In</Link>
+          <h2 className="text-2xl font-display font-bold text-gray-800 mb-2">{t('cart.signInTitle')}</h2>
+          <p className="text-gray-500 mb-6">{t('cart.signInDesc')}</p>
+          <Link to="/login" className="btn-primary">{t('cart.signIn')}</Link>
         </div>
       </div>
     );
@@ -27,14 +29,11 @@ export default function CartPage() {
 
   const isEmpty = !cart.items || cart.items.length === 0;
 
-  // ── Quantity controls ────────────────────────────────────────────
-  // Decrease by 1 → removes item if reaches 0
-  // Backend handles quantity=0 as a delete automatically
   const handleQuantityChange = async (item, delta) => {
     const newQty = (item.quantity || 1) + delta;
     if (newQty < 1) {
       await removeItem(item._id);
-      toast.success('Item removed');
+      toast.success(i18next.t('msg.itemRemoved'));
     } else {
       await updateItem(item._id, { quantity: newQty });
     }
@@ -42,12 +41,9 @@ export default function CartPage() {
 
   const handleRemove = async (id) => {
     await removeItem(id);
-    toast.success('Removed from cart');
+    toast.success(i18next.t('msg.removedFromCart'));
   };
 
-  // ── Item price = pricePerItem × quantity ──────────────────────────
-  // Backend stores pricePerItem (price for ONE item at the chosen serving size)
-  // Total for this line = pricePerItem × quantity
   const itemTotal = (item) => ((item.pricePerItem || 0) * (item.quantity || 1)).toLocaleString();
 
   return (
@@ -55,7 +51,7 @@ export default function CartPage() {
       <div className="bg-white border-b border-gray-100">
         <div className="page-container py-8">
           <h1 className="font-display text-4xl font-bold text-gray-900 flex items-center gap-3">
-            <ShoppingCart className="w-8 h-8 text-brand-500" /> Your Cart
+            <ShoppingCart className="w-8 h-8 text-brand-500" /> {t('cart.title')}
           </h1>
         </div>
       </div>
@@ -66,68 +62,49 @@ export default function CartPage() {
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Package className="w-10 h-10 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-display font-bold text-gray-700 mb-3">Your cart is empty</h2>
-            <p className="text-gray-400 mb-6">Add some delicious meal boxes to get started!</p>
-            <Link to="/boxes" className="btn-primary">Browse Meal Boxes</Link>
+            <h2 className="text-2xl font-display font-bold text-gray-700 mb-3">{t('cart.emptyTitle')}</h2>
+            <p className="text-gray-400 mb-6">{t('cart.emptyDesc')}</p>
+            <Link to="/boxes" className="btn-primary">{t('cart.browse')}</Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-            {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
               {cart.items.map((item) => {
-                // Backend populates item.box with { _id, name, image, basePrice }
                 const box = item.box || {};
-                const servingLabel = item.servingSize === 1 ? '1 person' : `${item.servingSize} people`;
+                const servingLabel = item.servingSize === 1
+                  ? `1 ${t('cart.person')}`
+                  : `${item.servingSize} ${t('cart.people')}`;
 
                 return (
                   <div key={item._id} className="card p-5">
                     <div className="flex items-start gap-4">
-
-                      {/* Box image */}
                       <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                         {box.image
                           ? <img src={box.image} alt={box.name} className="w-full h-full object-cover" />
                           : <div className="w-full h-full flex items-center justify-center"><Package className="w-6 h-6 text-gray-400" /></div>
                         }
                       </div>
-
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            {/* box.name replaces item.boxName */}
                             <h3 className="font-display font-bold text-gray-900">{box.name || 'Meal Box'}</h3>
-                            {/* item.servingSize replaces item.servingsPerMeal */}
-                            <p className="text-sm text-gray-500 mt-0.5">
-                              Serving size: {servingLabel}
-                            </p>
-                            <span className="text-xs mt-1 inline-block badge badge-orange">Pre-Made Box</span>
+                            <p className="text-sm text-gray-500 mt-0.5">{t('cart.servingSize')} {servingLabel}</p>
+                            <span className="text-xs mt-1 inline-block badge badge-orange">{t('cart.preMadeBox')}</span>
                           </div>
                           <button onClick={() => handleRemove(item._id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-
-                        {/* Quantity + price row */}
                         <div className="flex items-center justify-between mt-3">
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleQuantityChange(item, -1)}
-                              disabled={loading}
-                              className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors disabled:opacity-50"
-                            >
+                            <button onClick={() => handleQuantityChange(item, -1)} disabled={loading} className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors disabled:opacity-50">
                               <Minus className="w-3 h-3" />
                             </button>
                             <span className="font-semibold text-gray-900 w-6 text-center">{item.quantity || 1}</span>
-                            <button
-                              onClick={() => handleQuantityChange(item, 1)}
-                              disabled={loading}
-                              className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors disabled:opacity-50"
-                            >
+                            <button onClick={() => handleQuantityChange(item, 1)} disabled={loading} className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors disabled:opacity-50">
                               <Plus className="w-3 h-3" />
                             </button>
                           </div>
-                          {/* pricePerItem × quantity replaces item.totalPrice */}
                           <span className="font-display font-bold text-lg text-brand-600">{itemTotal(item)} EGP</span>
                         </div>
                       </div>
@@ -137,10 +114,9 @@ export default function CartPage() {
               })}
             </div>
 
-            {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="card p-6 sticky top-24">
-                <h2 className="font-display text-xl font-bold mb-4">Order Summary</h2>
+                <h2 className="font-display text-xl font-bold mb-4">{t('cart.summary')}</h2>
                 <div className="space-y-2 text-sm text-gray-600 mb-4">
                   {cart.items.map(item => (
                     <div key={item._id} className="flex justify-between">
@@ -151,22 +127,19 @@ export default function CartPage() {
                 </div>
                 <div className="border-t border-gray-100 pt-4 mb-6">
                   <div className="flex justify-between items-end">
-                    <span className="font-semibold text-gray-700">Total</span>
+                    <span className="font-semibold text-gray-700">{t('cart.total')}</span>
                     <div className="text-right">
-                      <span className="text-2xl font-display font-black text-brand-600">
-                        {cart.cartTotal?.toLocaleString()} EGP
-                      </span>
-                      <div className="text-xs text-gray-400">Cash on Delivery</div>
+                      <span className="text-2xl font-display font-black text-brand-600">{cart.cartTotal?.toLocaleString()} EGP</span>
+                      <div className="text-xs text-gray-400">{t('cart.cod')}</div>
                     </div>
                   </div>
                 </div>
                 <button onClick={() => navigate('/checkout')} className="btn-primary w-full flex items-center justify-center gap-2">
-                  Proceed to Checkout <ArrowRight className="w-4 h-4" />
+                  {t('cart.checkout')} <ArrowRight className="w-4 h-4" />
                 </button>
-                <Link to="/boxes" className="btn-secondary w-full text-center block mt-3">Continue Shopping</Link>
+                <Link to="/boxes" className="btn-secondary w-full text-center block mt-3">{t('cart.continue')}</Link>
               </div>
             </div>
-
           </div>
         )}
       </div>

@@ -2,27 +2,26 @@ import { useState, useEffect } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { User, Package, Repeat, Settings, LogOut } from 'lucide-react';
-import api from '../../api/axios';
-import toast from 'react-hot-toast';
-
-const navItems = [
-  { to: '/dashboard', label: 'Profile', icon: User, end: true },
-  { to: '/dashboard/orders', label: 'My Orders', icon: Package },
-  { to: '/dashboard/subscriptions', label: 'Subscriptions', icon: Repeat },
-  { to: '/dashboard/settings', label: 'Settings', icon: Settings },
-];
+import { useTranslation } from 'react-i18next';
 
 export default function DashboardLayout() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   if (!user) { navigate('/login'); return null; }
+
+  const navItems = [
+    { to: '/dashboard',                label: t('dash.profile'),       icon: User,     end: true },
+    { to: '/dashboard/orders',         label: t('dash.myOrders'),      icon: Package },
+    { to: '/dashboard/subscriptions',  label: t('dash.subscriptions'), icon: Repeat },
+    { to: '/dashboard/settings',       label: t('dash.settings'),      icon: Settings },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="page-container py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Sidebar */}
           <aside className="md:col-span-1">
             <div className="card p-5 mb-4">
               <div className="flex flex-col items-center text-center">
@@ -43,12 +42,11 @@ export default function DashboardLayout() {
                 </NavLink>
               ))}
               <button onClick={() => { logout(); navigate('/'); }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-medium text-red-600 hover:bg-red-50 w-full transition-colors border-t border-gray-100">
-                <LogOut className="w-4 h-4" /> Logout
+                <LogOut className="w-4 h-4" /> {t('dash.logout')}
               </button>
             </nav>
           </aside>
 
-          {/* Content */}
           <main className="md:col-span-3">
             <Outlet />
           </main>
