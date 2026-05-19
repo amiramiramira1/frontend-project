@@ -190,5 +190,22 @@
     "orderGenerated":        "تم إنشاء الطلب!",
     "adminFailed":           "حدث خطأ",
     "loadUsersFailed":       "فشل تحميل المستخدمين"
+  },
+
+  "login": {
+    "panelTitle":      "مرحباً بعودتك!",
+    "panelSubtitle":   "صناديق وجباتك الطازجة في انتظارك. سجّل دخولك لمتابعة رحلتك مع Boxify.",
+    "heading":         "تسجيل الدخول",
+    "subheading":      "أدخل بياناتك للمتابعة",
+    "emailLabel":      "البريد الإلكتروني",
+    "emailPlaceholder":"you@example.com",
+    "passwordLabel":   "كلمة المرور",
+    "forgotPassword":  "نسيت كلمة المرور؟",
+    "signingIn":       "جارٍ تسجيل الدخول...",
+    "signIn":          "تسجيل الدخول",
+    "continueGoogle":  "المتابعة بـ Google",
+    "continueFacebook":"المتابعة بـ Facebook",
+    "noAccount":       "ليس لديك حساب؟",
+    "createOne":       "أنشئ حساباً"
   }
 }

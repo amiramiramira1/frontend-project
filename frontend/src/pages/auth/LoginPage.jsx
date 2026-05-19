@@ -19,7 +19,7 @@ export default function LoginPage() {
     try {
       const user = await login(form.email, form.password);
       navigate(user.role === 'admin' ? '/admin' : '/');
-    } catch (err) {
+    } catch {
       setError(t('msg.loginFailed'));
     }
   };
@@ -45,7 +45,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
-      {/* Left Side */}
+      {/* Left decorative panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-hero-pattern items-center justify-center relative overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800"
@@ -57,19 +57,19 @@ export default function LoginPage() {
             <Package className="w-10 h-10 text-brand-400" />
           </div>
           <h2 className="font-display text-4xl font-black mb-4">
-            Welcome Back!
+            {t('login.panelTitle')}
           </h2>
           <p className="text-lg text-gray-300 max-w-sm">
-            Fresh meal kits waiting for you. Log in to continue your Boxify journey.
+            {t('login.panelSubtitle')}
           </p>
         </div>
       </div>
 
-      {/* Right Side */}
+      {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
 
-          {/* Header */}
+          {/* Logo + heading */}
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
@@ -79,11 +79,10 @@ export default function LoginPage() {
             </Link>
 
             <h1 className="font-display text-3xl font-bold text-gray-900">
-              Sign In
+              {t('login.heading')}
             </h1>
-
             <p className="text-gray-500 mt-2">
-              Enter your credentials to continue
+              {t('login.subheading')}
             </p>
           </div>
 
@@ -99,28 +98,38 @@ export default function LoginPage() {
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email Address
+                {t('login.emailLabel')}
               </label>
               <input
                 type="email"
                 required
                 value={form.email}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, email: e.target.value }))
-                }
+                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                 className="input-field"
-                placeholder="you@example.com"
+                placeholder={t('login.emailPlaceholder')}
               />
             </div>
 
             {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Password
+                {t('login.passwordLabel')}
               </label>
               <div className="relative">
-                <input type="text" style={{ WebkitTextSecurity: showPw ? 'none' : 'disc' }} required value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="input-field pr-12" placeholder="••••••••" />
-                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <input
+                  type="text"
+                  style={{ WebkitTextSecurity: showPw ? 'none' : 'disc' }}
+                  required
+                  value={form.password}
+                  onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                  className="input-field pr-12"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -129,17 +138,17 @@ export default function LoginPage() {
             {/* Forgot password */}
             <div className="flex justify-end">
               <Link to="/forgot-password" className="text-sm text-brand-600 hover:underline font-medium">
-                Forgot password?
+                {t('login.forgotPassword')}
               </Link>
             </div>
 
-            {/* Login */}
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
               className="btn-primary w-full"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? t('login.signingIn') : t('login.signIn')}
             </button>
 
             {/* Divider */}
@@ -149,14 +158,12 @@ export default function LoginPage() {
               <div className="flex-1 h-px bg-gray-200" />
             </div>
 
-            {/* OAuth Buttons */}
+            {/* OAuth */}
             <div className="space-y-3">
-
-              {/* Google */}
               <button
                 type="button"
                 onClick={handleGoogle}
-                className="w-full border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-3 hover:bg-gray-50"
+                className="w-full border border-gray-300 rounded-xl py-2 flex items-center justify-center gap-3 hover:bg-gray-50 transition-colors"
               >
                 <img
                   src="https://www.svgrepo.com/show/355037/google.svg"
@@ -164,15 +171,14 @@ export default function LoginPage() {
                   className="w-5 h-5"
                 />
                 <span className="text-sm font-medium text-gray-700">
-                  Continue with Google
+                  {t('login.continueGoogle')}
                 </span>
               </button>
 
-              {/* Facebook */}
               <button
                 type="button"
                 onClick={handleFacebook}
-                className="w-full bg-[#1877f2] text-white rounded-xl py-2 flex items-center justify-center gap-3 hover:opacity-90"
+                className="w-full bg-[#1877f2] text-white rounded-xl py-2 flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
               >
                 <img
                   src="https://www.svgrepo.com/show/183607/facebook.svg"
@@ -180,18 +186,17 @@ export default function LoginPage() {
                   className="w-5 h-5"
                 />
                 <span className="text-sm font-medium">
-                  Continue with Facebook
+                  {t('login.continueFacebook')}
                 </span>
               </button>
-
             </div>
           </form>
 
-          {/* Register */}
+          {/* Register link */}
           <div className="mt-6 text-center text-sm text-gray-500">
-            Don't have an account?{' '}
+            {t('login.noAccount')}{' '}
             <Link to="/register" className="text-brand-600 font-semibold hover:underline">
-              Create one
+              {t('login.createOne')}
             </Link>
           </div>
 

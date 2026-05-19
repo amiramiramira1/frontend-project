@@ -190,5 +190,22 @@
     "orderGenerated":        "Order generated!",
     "adminFailed":           "Failed",
     "loadUsersFailed":       "Failed to load users"
+  },
+
+  "login": {
+    "panelTitle":      "Welcome Back!",
+    "panelSubtitle":   "Fresh meal kits waiting for you. Log in to continue your Boxify journey.",
+    "heading":         "Sign In",
+    "subheading":      "Enter your credentials to continue",
+    "emailLabel":      "Email Address",
+    "emailPlaceholder":"you@example.com",
+    "passwordLabel":   "Password",
+    "forgotPassword":  "Forgot password?",
+    "signingIn":       "Signing in...",
+    "signIn":          "Sign In",
+    "continueGoogle":  "Continue with Google",
+    "continueFacebook":"Continue with Facebook",
+    "noAccount":       "Don't have an account?",
+    "createOne":       "Create one"
   }
 }
