@@ -284,35 +284,25 @@ function AdminInventory() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  // TODO: Switch to api.get('/meals') when backend adds inStock & stockQuantity to Meal model
-  // api.get('/meals', { params: { limit: 100 } })
-  //   .then(({ data }) => setMeals(data.meals || []))
-  //   .catch(() => toast.error('Failed to load meals'))
-  //   .finally(() => setLoading(false));
+    api.get('/meals', { params: { limit: 100 } })
+      .then(({ data }) => setMeals(data.meals || []))
+      .catch(() => toast.error('Failed to load meals'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  // Option 2 — seed from sampleMeals with inStock & stockQuantity defaults
-  const saved = JSON.parse(localStorage.getItem('boxify_inventory') || '[]');
-  if (saved.length > 0) {
-    setMeals(saved);
-  } else {
-    const seeded = sampleMeals.map(m => ({ ...m, inStock: false, stockQuantity: 0 }));
-    localStorage.setItem('boxify_inventory', JSON.stringify(seeded));
-    setMeals(seeded);
-  }
-  setLoading(false);
-}, []);
-
-const updateMeal = async (id, changes) => {
-  // Optimistic update
-  setMeals(prev => {
-    const updated = prev.map(m => m._id === id ? { ...m, ...changes } : m);
-    // TODO: Replace localStorage with api.put(`/meals/${id}`, changes) when backend is ready
-    // api.put(`/meals/${id}`, changes)
-    localStorage.setItem('boxify_inventory', JSON.stringify(updated));
-    return updated;
-  });
-  toast.success('Meal updated');
-};
+  const updateMeal = async (id, changes) => {
+    // Optimistic update
+    setMeals(prev => prev.map(m => m._id === id ? { ...m, ...changes } : m));
+    try {
+      await api.put(`/meals/${id}`, changes);
+      toast.success('Meal updated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update meal');
+      // Rollback on error: refetch to sync correct database state
+      api.get('/meals', { params: { limit: 100 } })
+        .then(({ data }) => setMeals(data.meals || []));
+    }
+  };
 
   if (loading) return <div className="animate-pulse h-60 bg-gray-100 rounded-2xl" />;
 
