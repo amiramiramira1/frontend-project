@@ -419,8 +419,8 @@ export default function BoxDetailPage() {
                 {adding ? 'Adding...' : 'Add to Cart'}
               </button>
 
-              <button onClick={handleSubscribe} className="btn-outline w-full flex items-center justify-center gap-2">
-                <Repeat className="w-4 h-4" /> Subscribe Weekly
+                <button onClick={handleSubscribe} className="btn-outline w-full flex items-center justify-center gap-2">
+                <Repeat className="w-4 h-4" /> Subscribe
               </button>
 
               {/* Nutritional summary */}

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   createSubscription, getMySubscriptions, pauseSubscription,
-  cancelSubscription, getAllSubscriptions,
+  cancelSubscription, getAllSubscriptions, updateSubscription,
 } = require('../controllers/subscriptionController');
 const { protect } = require('../middleware/authMiddleware');
 const { adminOnly } = require('../middleware/adminMiddleware');
@@ -15,5 +15,6 @@ router.get('/my', protect, getMySubscriptions);
 router.put('/:id/pause', protect, pauseSubscription);
 router.put('/:id/cancel', protect, cancelSubscription);
 router.get('/', protect, adminOnly, getAllSubscriptions);
+router.patch('/:id', protect, updateSubscription);
 
 module.exports = router;

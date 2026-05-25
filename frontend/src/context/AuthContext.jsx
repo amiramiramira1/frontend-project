@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await api.put('/auth/profile', updates);
       const token = localStorage.getItem('boxify_token');
-      persistUser(data, token);
+      persistUser(data.user, token);
       toast.success(i18next.t('msg.profileUpdated'));
       return data;
     } catch (err) {

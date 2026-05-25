@@ -42,7 +42,7 @@ export default function SubscribePage() {
     if (!boxId) { toast.error(i18next.t('msg.subscribeNoBox')); return; }
     setLoading(true);
     try {
-      await api.post('/subscriptions', { boxId, servingSize: servings, frequency: form.frequency });
+      await api.post('/subscriptions', { boxId, servingSize: servings, frequency: form.frequency, deliveryDay: form.deliveryDay });
       toast.success(i18next.t('msg.subscribeCreated'));
       navigate('/dashboard/subscriptions');
     } catch (err) {

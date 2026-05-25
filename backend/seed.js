@@ -9,6 +9,7 @@ const Meal         = require('./models/Meal');
 const Box          = require('./models/Box');
 const Subscription = require('./models/Subscription');
 const Order        = require('./models/Order');
+const { getNextDeliveryDate } = require('./jobs/subscriptionJob');
 
 // Configure Cloudinary from .env
 cloudinary.config({
@@ -209,19 +210,18 @@ const seed = async () => {
 
     // --- Seed Subscriptions ---
     console.log('🔄 Seeding subscriptions...');
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-
     await Subscription.insertMany([
       {
         user: customer1._id, box: boxes[1]._id,
-        servingSize: 2, frequency: 'weekly', status: 'active',
-        nextDeliveryDate: nextWeek, mealRotation: boxes[1].meals,
+        servingSize: 2, frequency: 'weekly', deliveryDay: 'saturday', status: 'active',
+        nextDeliveryDate: getNextDeliveryDate('weekly', 'saturday'),
+        mealRotation: boxes[1].meals,
       },
       {
         user: customer2._id, box: boxes[0]._id,
-        servingSize: 4, frequency: 'monthly', status: 'active',
-        nextDeliveryDate: nextWeek, mealRotation: boxes[0].meals,
+        servingSize: 4, frequency: 'monthly', deliveryDay: 'tuesday', status: 'active',
+        nextDeliveryDate: getNextDeliveryDate('monthly', 'tuesday'),
+        mealRotation: boxes[0].meals,
       },
     ]);
     console.log('✅ Subscriptions seeded');

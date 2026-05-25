@@ -1,8 +1,9 @@
-const User = require('../models/User');
-const Order = require('../models/Order');
-const Box = require('../models/Box');
-const Meal = require('../models/Meal');
+const User         = require('../models/User');
+const Order        = require('../models/Order');
+const Box          = require('../models/Box');
+const Meal         = require('../models/Meal');
 const Subscription = require('../models/Subscription');
+const { getNextDeliveryDate } = require('../jobs/subscriptionJob');
 
 // @route   GET /api/admin/stats
 // @access  Private/Admin
@@ -128,14 +129,11 @@ const manuallyGenerateSubscriptionOrder = async (req, res) => {
       status: 'confirmed',
     });
 
-    // Update next delivery date
-    const nextDate = new Date();
-    if (subscription.frequency === 'weekly') {
-      nextDate.setDate(nextDate.getDate() + 7);
-    } else {
-      nextDate.setMonth(nextDate.getMonth() + 1);
-    }
-    subscription.nextDeliveryDate = nextDate;
+    // Advance to the next delivery on the user's preferred weekday
+    subscription.nextDeliveryDate = getNextDeliveryDate(
+      subscription.frequency,
+      subscription.deliveryDay,
+    );
     await subscription.save();
 
     res.status(201).json({

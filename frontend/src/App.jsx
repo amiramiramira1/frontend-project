@@ -25,6 +25,9 @@ import ProfilePage from './pages/dashboard/ProfilePage';
 import OrdersPage from './pages/dashboard/OrdersPage';
 import SubscriptionsPage from './pages/dashboard/SubscriptionsPage';
 import AdminLayout from './pages/admin/AdminLayout';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+import EditSubscriptionPage from './pages/dashboard/EditSubscriptionPage';
+import SettingsPage from './pages/dashboard/SettingsPage';
 
 function AppLayout({ children }) {
   return (
@@ -52,10 +55,13 @@ function AppRoutes() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/edit-subscription" element={<EditSubscriptionPage />} />
       <Route path="/dashboard" element={<AppLayout><DashboardLayout /></AppLayout>}>
         <Route index element={<ProfilePage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="/admin/*" element={<AdminLayout />} />
       <Route path="*" element={<Navigate to="/" replace />} />

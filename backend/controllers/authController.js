@@ -144,6 +144,16 @@ const changePassword = async (req, res) => {
   }
 };
 
-// Add to module.exports:
-module.exports = { register, login, getMe, updateProfile, changePassword };
+// @route   DELETE /api/auth/me
+// @access  Private
+const deleteAccount = async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.user.id);
+    res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { register, login, getMe, updateProfile, changePassword, deleteAccount };
 

@@ -125,10 +125,22 @@ export default function BuildBoxPage() {
     ? meals.filter(m => !selected[m._id] && m.dietType === lastSelected.dietType && m.inStock !== false && m.stockQuantity !== 0).slice(0, 2)
     : [];
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     if (!user) { navigate('/login'); return; }
     if (Object.keys(selected).length === 0) { toast.error(t('msg.selectMeal')); return; }
-    toast.info('Subscribe with custom box is coming soon!');
+    try {
+      const mealIds = Object.entries(selected).flatMap(([id, qty]) => Array(qty).fill(id));
+      const { data: boxData } = await api.post('/boxes/custom', {
+        meals: mealIds,
+        name: boxName,
+        servingSize: servings,
+      });
+      navigate(
+        `/subscribe?boxId=${boxData.box._id}&servings=${servings}&type=custom&name=${encodeURIComponent(boxName)}`,
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('msg.addToCartFailed'));
+    }
   };
 
   const handleSaveTemplate = () => {
@@ -400,7 +412,7 @@ export default function BuildBoxPage() {
               </button>
 
               <button onClick={handleSubscribe} disabled={mealCount === 0} className="btn-outline w-full flex items-center justify-center gap-2">
-                <Repeat className="w-4 h-4" /> {t('buildBox.subscribeWeekly')}
+                <Repeat className="w-4 h-4" /> {t('buildBox.subscribe')}
               </button>
             </div>
           </div>

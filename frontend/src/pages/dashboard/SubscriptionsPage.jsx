@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 import toast from 'react-hot-toast';
-import { Repeat, PauseCircle, PlayCircle, XCircle, Calendar, Package, AlertCircle } from 'lucide-react';
+import { Repeat, PauseCircle, PlayCircle, XCircle, Calendar, Package, AlertCircle, Pencil } from 'lucide-react';
 
 // Backend serving multipliers (same as backend)
 const MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
@@ -117,7 +117,7 @@ export default function SubscriptionsPage() {
                 </div>
 
                 {/* Details grid */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="bg-gray-50 rounded-xl p-3 text-center">
                     <Calendar className="w-4 h-4 text-brand-500 mx-auto mb-1" />
                     <div className="text-xs text-gray-500">{t('subs.nextDelivery')}</div>
@@ -125,6 +125,13 @@ export default function SubscriptionsPage() {
                       {sub.nextDeliveryDate
                         ? new Date(sub.nextDeliveryDate).toLocaleDateString('en-EG', { month: 'short', day: 'numeric' })
                         : '—'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3 text-center">
+                    <Repeat className="w-4 h-4 text-brand-500 mx-auto mb-1" />
+                    <div className="text-xs text-gray-500">{t('subs.deliveryDay')}</div>
+                    <div className="text-sm font-semibold capitalize">
+                      {sub.deliveryDay || '—'}
                     </div>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3 text-center">
@@ -138,6 +145,14 @@ export default function SubscriptionsPage() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                  {sub.status !== 'cancelled' && (
+                    <button
+                      onClick={() => navigate('/edit-subscription', { state: { sub } })}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-xl transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" /> Edit
+                    </button>
+                  )}
                   {sub.status === 'active' && (
                     <button
                       onClick={() => handleTogglePause(sub._id, sub.status)}
