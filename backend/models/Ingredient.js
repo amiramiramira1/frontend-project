@@ -23,6 +23,14 @@ const ingredientSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    inStock: {
+      type: Boolean,
+      default: true,
+    },
+    stockQuantity: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true } // Automatically adds createdAt and updatedAt
 );

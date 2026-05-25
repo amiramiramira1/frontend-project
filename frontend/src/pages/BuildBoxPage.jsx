@@ -122,7 +122,7 @@ export default function BuildBoxPage() {
   const lastSelectedId = Object.keys(selected).slice(-1)[0];
   const lastSelected   = lastSelectedId ? meals.find(m => m._id === lastSelectedId) : null;
   const suggestions    = lastSelected
-    ? meals.filter(m => !selected[m._id] && m.dietType === lastSelected.dietType).slice(0, 2)
+    ? meals.filter(m => !selected[m._id] && m.dietType === lastSelected.dietType && m.inStock !== false && m.stockQuantity !== 0).slice(0, 2)
     : [];
 
   const handleSubscribe = () => {
@@ -233,12 +233,18 @@ export default function BuildBoxPage() {
                 {filtered.map(meal => {
                   const qty     = selected[meal._id] ?? 0;
                   const isAdded = qty > 0;
+                  const isOutOfStock = meal.inStock === false || meal.stockQuantity === 0;
                   const atMax   = qty >= MAX_QTY_PER_MEAL;
                   const boxFull = mealCount >= MAX_TOTAL_MEALS;
                   return (
                     <div key={meal._id} className={`card overflow-hidden transition-all duration-200 ${isAdded ? 'ring-2 ring-brand-500 shadow-md' : ''}`}>
                       <div className="relative">
                         <img src={meal.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400'} alt={meal.name} className="w-full h-36 object-cover" />
+                        {isOutOfStock && (
+                          <div className="absolute top-2 left-2">
+                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md uppercase tracking-wider">Out of Stock</span>
+                          </div>
+                        )}
                         {isAdded && (
                           <div className="absolute top-2 right-2">
                             <span className="bg-brand-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">×{qty}</span>
@@ -252,7 +258,12 @@ export default function BuildBoxPage() {
                           <span className="font-medium text-brand-600">{(meal.pricePerServing * servings).toFixed(0)} EGP</span>
                           <span className="capitalize text-gray-400">{t(`cuisine.${meal.cuisine?.toLowerCase()}`, { defaultValue: meal.cuisine })}</span>
                         </div>
-                        {!isAdded ? (
+                        {isOutOfStock ? (
+                          <button disabled
+                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200">
+                            Out of Stock
+                          </button>
+                        ) : !isAdded ? (
                           <button onClick={() => addMeal(meal._id)} disabled={boxFull}
                             className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium transition-all ${boxFull ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-500 hover:text-white hover:border-brand-500'}`}>
                             <Plus className="w-3.5 h-3.5" /> {boxFull ? t('buildBox.boxFull') : t('buildBox.add')}
@@ -266,7 +277,7 @@ export default function BuildBoxPage() {
                               <span className="font-bold text-gray-900 text-sm">{qty}</span>
                               <p className="text-xs text-gray-400 leading-none">{qty === MAX_QTY_PER_MEAL ? t('buildBox.max') : `${t('buildBox.of')} ${MAX_QTY_PER_MEAL}`}</p>
                             </div>
-                            <button onClick={() => changeMealQty(meal._id, +1)} disabled={atMax || boxFull}
+                            <button onClick={() => changeMealQty(meal._id, +1)} disabled={atMax || boxFull || isOutOfStock}
                               className="w-8 h-8 rounded-lg bg-white border border-gray-200 hover:bg-brand-50 hover:text-brand-600 flex items-center justify-center disabled:opacity-40">
                               <Plus className="w-3.5 h-3.5" />
                             </button>
@@ -341,7 +352,7 @@ export default function BuildBoxPage() {
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={() => changeMealQty(m._id, -1)} className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"><Minus className="w-2.5 h-2.5" /></button>
                         <span className="font-semibold w-4 text-center">{selected[m._id]}</span>
-                        <button onClick={() => changeMealQty(m._id, +1)} disabled={selected[m._id] >= MAX_QTY_PER_MEAL} className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center disabled:opacity-40"><Plus className="w-2.5 h-2.5" /></button>
+                        <button onClick={() => changeMealQty(m._id, +1)} disabled={selected[m._id] >= MAX_QTY_PER_MEAL || m.inStock === false || m.stockQuantity === 0} className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center disabled:opacity-40"><Plus className="w-2.5 h-2.5" /></button>
                       </div>
                     </div>
                   ))}
