@@ -1,4 +1,5 @@
 const Ingredient = require('../models/Ingredient');
+const paginate = require('../utils/paginate');
 
 // @route   GET /api/ingredients
 // @access  Private/Admin
