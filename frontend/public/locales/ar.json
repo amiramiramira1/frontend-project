@@ -127,7 +127,6 @@
   "msg": {
     "loginFailed":           "فشل تسجيل الدخول",
     "googleLoginFailed":     "فشل تسجيل الدخول بـ Google",
-    "facebookLoginFailed":   "فشل تسجيل الدخول بـ Facebook",
     "registrationFailed":    "فشل إنشاء الحساب",
     "passwordMin6":          "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
     "passwordMin8":          "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
@@ -142,7 +141,6 @@
     "welcomeBack":           "مرحباً بعودتك، {{name}}!",
     "welcomeNew":            "مرحباً بك في Boxify، {{name}}!",
     "loggedInGoogle":        "تم تسجيل الدخول بـ Google",
-    "loggedInFacebook":      "تم تسجيل الدخول بـ Facebook",
     "verificationResent":    "تم إعادة إرسال بريد التحقق!",
     "emailVerified":         "تم التحقق من البريد! يمكنك الآن تسجيل الدخول.",
     "addToCartFailed":       "فشل إضافة العنصر إلى السلة",
@@ -204,7 +202,6 @@
     "signingIn":       "جارٍ تسجيل الدخول...",
     "signIn":          "تسجيل الدخول",
     "continueGoogle":  "المتابعة بـ Google",
-    "continueFacebook":"المتابعة بـ Facebook",
     "noAccount":       "ليس لديك حساب؟",
     "createOne":       "أنشئ حساباً"
   },

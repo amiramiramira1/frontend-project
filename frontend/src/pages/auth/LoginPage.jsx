@@ -5,7 +5,7 @@ import { Package, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
-  const { login, loginWithGoogle, loginWithFacebook, loading } = useAuth();
+  const { login, loginWithGoogle, loading } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -24,22 +24,9 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogle = async () => {
-    try {
-      const user = await loginWithGoogle();
-      navigate(user.role === 'admin' ? '/admin' : '/');
-    } catch {
-      setError(t('msg.googleLoginFailed'));
-    }
-  };
-
-  const handleFacebook = async () => {
-    try {
-      const user = await loginWithFacebook();
-      navigate(user.role === 'admin' ? '/admin' : '/');
-    } catch {
-      setError(t('msg.facebookLoginFailed'));
-    }
+  const handleGoogle = () => {
+    // loginWithGoogle does a full browser redirect — no async/try-catch needed
+    loginWithGoogle();
   };
 
   return (
@@ -172,21 +159,6 @@ export default function LoginPage() {
                 />
                 <span className="text-sm font-medium text-gray-700">
                   {t('login.continueGoogle')}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleFacebook}
-                className="w-full bg-[#1877f2] text-white rounded-xl py-2 flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
-              >
-                <img
-                  src="https://www.svgrepo.com/show/183607/facebook.svg"
-                  alt="facebook"
-                  className="w-5 h-5"
-                />
-                <span className="text-sm font-medium">
-                  {t('login.continueFacebook')}
                 </span>
               </button>
             </div>

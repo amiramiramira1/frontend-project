@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const passport = require('./config/googleStrategy');
 
 // --- Import Routes ---
 const authRoutes         = require('./routes/authRoutes');
@@ -26,6 +27,7 @@ const app = express();
 // --- Global Middleware ---
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize()); // Required for passport-google-oauth20
 
 // --- API Routes ---
 app.use('/api/auth',          authRoutes);

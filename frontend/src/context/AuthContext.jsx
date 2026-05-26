@@ -105,31 +105,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── OAUTH (mock) ──────────────────────────────────────────────────
-  const loginWithGoogle = async () => {
-    setLoading(true);
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockUser = { _id: 'google-' + Date.now(), name: 'Google User', email: 'google@gmail.com', role: 'customer' };
-        persistUser(mockUser, 'google-mock-token-' + Date.now());
-        toast.success(i18next.t('msg.loggedInGoogle'));
-        setLoading(false);
-        resolve(mockUser);
-      }, 1000);
-    });
-  };
-
-  const loginWithFacebook = async () => {
-    setLoading(true);
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockUser = { _id: 'facebook-' + Date.now(), name: 'Facebook User', email: 'fb@gmail.com', role: 'customer' };
-        persistUser(mockUser, 'facebook-mock-token-' + Date.now());
-        toast.success(i18next.t('msg.loggedInFacebook'));
-        setLoading(false);
-        resolve(mockUser);
-      }, 1000);
-    });
+  // ── GOOGLE OAUTH ──────────────────────────────────────────────────
+  // Redirects the browser to the backend which redirects to Google.
+  // No Promise needed — this is a full page navigation, not an API call.
+  const loginWithGoogle = () => {
+    const backendURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    window.location.href = `${backendURL}/api/auth/google`;
   };
 
   // ── DELETE ACCOUNT ────────────────────────────────────────────────
@@ -154,7 +135,6 @@ export const AuthProvider = ({ children }) => {
       changePassword,
       isAdmin: user?.role === 'admin',
       loginWithGoogle,
-      loginWithFacebook,
       deleteAccount,
     }}>
       {children}

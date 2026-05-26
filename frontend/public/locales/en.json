@@ -127,7 +127,6 @@
   "msg": {
     "loginFailed":           "Login failed",
     "googleLoginFailed":     "Google login failed",
-    "facebookLoginFailed":   "Facebook login failed",
     "registrationFailed":    "Registration failed",
     "passwordMin6":          "Password must be at least 6 characters",
     "passwordMin8":          "Password must be at least 8 characters",
@@ -142,7 +141,6 @@
     "welcomeBack":           "Welcome back, {{name}}!",
     "welcomeNew":            "Welcome to Boxify, {{name}}!",
     "loggedInGoogle":        "Logged in with Google",
-    "loggedInFacebook":      "Logged in with Facebook",
     "verificationResent":    "Verification email resent!",
     "emailVerified":         "Email verified! You can now sign in.",
     "addToCartFailed":       "Failed to add to cart",
@@ -204,7 +202,6 @@
     "signingIn":       "Signing in...",
     "signIn":          "Sign In",
     "continueGoogle":  "Continue with Google",
-    "continueFacebook":"Continue with Facebook",
     "noAccount":       "Don't have an account?",
     "createOne":       "Create one"
   },

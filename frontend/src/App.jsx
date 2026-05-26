@@ -28,6 +28,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import EditSubscriptionPage from './pages/dashboard/EditSubscriptionPage';
 import SettingsPage from './pages/dashboard/SettingsPage';
+import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 
 function AppLayout({ children }) {
   return (
@@ -57,6 +58,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/edit-subscription" element={<EditSubscriptionPage />} />
+      <Route path="/auth/google/success" element={<GoogleCallbackPage />} />
       <Route path="/dashboard" element={<AppLayout><DashboardLayout /></AppLayout>}>
         <Route index element={<ProfilePage />} />
         <Route path="orders" element={<OrdersPage />} />
