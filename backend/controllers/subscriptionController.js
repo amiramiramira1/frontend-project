@@ -1,7 +1,9 @@
 const Subscription = require('../models/Subscription');
 const Box = require('../models/Box');
+const User = require('../models/User');
 const paginate = require('../utils/paginate');
 const { getNextDeliveryDate } = require('../jobs/subscriptionJob');
+const emailService = require('../services/emailService');
 
 // @route   POST /api/subscriptions
 // @access  Private
@@ -31,6 +33,14 @@ const createSubscription = async (req, res) => {
       nextDeliveryDate: getNextDeliveryDate(frequency, deliveryDay),
       mealRotation: box.meals.map((m) => m._id),
     });
+
+    // Fire-and-forget subscription created email
+    User.findById(req.user.id).then((user) => {
+      if (user) {
+        emailService.sendSubscriptionEmail(subscription, user, 'created')
+          .catch((err) => console.error('📧 Subscription email failed:', err.message));
+      }
+    }).catch(() => {});
 
     res.status(201).json({ message: 'Subscription created', subscription });
   } catch (error) {
@@ -67,6 +77,15 @@ const pauseSubscription = async (req, res) => {
     subscription.status = subscription.status === 'active' ? 'paused' : 'active';
     await subscription.save();
 
+    // Fire-and-forget paused/resumed email
+    const action = subscription.status === 'paused' ? 'paused' : 'resumed';
+    User.findById(req.user.id).then((user) => {
+      if (user) {
+        emailService.sendSubscriptionEmail(subscription, user, action)
+          .catch((err) => console.error('📧 Subscription email failed:', err.message));
+      }
+    }).catch(() => {});
+
     res.status(200).json({
       message: `Subscription ${subscription.status}`,
       subscription,
@@ -86,6 +105,15 @@ const cancelSubscription = async (req, res) => {
       { new: true }
     );
     if (!subscription) return res.status(404).json({ message: 'Subscription not found' });
+
+    // Fire-and-forget subscription cancelled email
+    User.findById(req.user.id).then((user) => {
+      if (user) {
+        emailService.sendSubscriptionEmail(subscription, user, 'cancelled')
+          .catch((err) => console.error('📧 Subscription email failed:', err.message));
+      }
+    }).catch(() => {});
+
     res.status(200).json({ message: 'Subscription cancelled', subscription });
   } catch (error) {
     res.status(400).json({ message: error.message });

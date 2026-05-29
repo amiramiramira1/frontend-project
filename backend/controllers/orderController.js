@@ -1,6 +1,8 @@
 const Order = require('../models/Order');
 const Box = require('../models/Box');
+const User = require('../models/User');
 const paginate = require('../utils/paginate');
+const emailService = require('../services/emailService');
 
 const SERVING_MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
 
@@ -85,7 +87,7 @@ const getAllOrders = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'];
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'];
 
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status value' });
@@ -98,6 +100,15 @@ const updateOrderStatus = async (req, res) => {
     );
 
     if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Fire-and-forget lifecycle email — never blocks the response
+    User.findById(order.user).then((user) => {
+      if (user) {
+        emailService.sendOrderStatusEmail(order, user)
+          .catch((err) => console.error('📧 Status email failed:', err.message));
+      }
+    }).catch(() => {});
+
     res.status(200).json({ message: 'Order status updated', order });
   } catch (error) {
     res.status(400).json({ message: error.message });
