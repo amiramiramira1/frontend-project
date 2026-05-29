@@ -1,24 +1,25 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import i18next from 'i18next';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation();
+  const { forgotPassword, loading } = useAuth();
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSent(true);
-      toast.success(i18next.t('msg.resetLinkSent'));
-    }, 1500);
+    setError('');
+    try {
+      await forgotPassword(email);
+      setSent(true); // Always show success — server never reveals if email exists
+    } catch (err) {
+      setError(err.response?.data?.message || t('msg.genericError'));
+    }
   };
 
   return (
@@ -59,6 +60,11 @@ export default function ForgotPasswordPage() {
 
           {!sent ? (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('forgot.emailLabel')}</label>
                 <div className="relative">

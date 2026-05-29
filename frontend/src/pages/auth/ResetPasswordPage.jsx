@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Package, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Package, Eye, EyeOff, Lock, CheckCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
+import { useAuth } from '../../context/AuthContext';
 
 function StrengthBar({ password }) {
   const { t } = useTranslation();
@@ -35,26 +36,50 @@ function StrengthBar({ password }) {
 export default function ResetPasswordPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { resetPassword, loading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') || '';
+
   const [form, setForm] = useState({ password: '', confirm: '' });
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
 
   const passwordsMatch = form.password && form.confirm && form.password === form.confirm;
   const isStrong = form.password.length >= 8;
 
-  const handleSubmit = (e) => {
+  // No token in URL — show an error state immediately
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="w-full max-w-md text-center space-y-4">
+          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <h1 className="font-display text-2xl font-bold text-gray-900">{t('reset.invalidHeading')}</h1>
+          <p className="text-gray-500 text-sm">{t('reset.invalidSubtext')}</p>
+          <Link to="/forgot-password" className="btn-primary inline-flex items-center gap-2">
+            {t('reset.requestNew')}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (form.password !== form.confirm) { toast.error(i18next.t('msg.passwordsMismatch')); return; }
     if (!isStrong) { toast.error(i18next.t('msg.passwordMin8')); return; }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError('');
+    try {
+      await resetPassword(token, form.password);
       setDone(true);
       toast.success(i18next.t('msg.passwordReset'));
-      setTimeout(() => navigate('/login'), 2000);
-    }, 1500);
+      setTimeout(() => navigate('/login'), 2500);
+    } catch (err) {
+      setError(err.response?.data?.message || t('reset.expiredError'));
+    }
   };
 
   return (
@@ -85,6 +110,13 @@ export default function ResetPasswordPage() {
 
           {!done ? (
             <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('reset.newPw')}</label>
                 <div className="relative">

@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Eye, EyeOff } from 'lucide-react';
+import { Package, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
   const { login, loginWithGoogle, loading } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const justVerified = searchParams.get('verified') === 'true';
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
@@ -19,8 +21,8 @@ export default function LoginPage() {
     try {
       const user = await login(form.email, form.password);
       navigate(user.role === 'admin' ? '/admin' : '/');
-    } catch {
-      setError(t('msg.loginFailed'));
+    } catch (err) {
+      setError(err.response?.data?.message || t('msg.loginFailed'));
     }
   };
 
@@ -72,6 +74,14 @@ export default function LoginPage() {
               {t('login.subheading')}
             </p>
           </div>
+
+          {/* Verified banner */}
+          {justVerified && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              {t('msg.emailVerified')}
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -30,7 +30,8 @@ passport.use(
         }
 
         // 3. Brand new user — create without a password.
-        user = await User.create({ name, email, googleId });
+        // isEmailVerified is true because Google already validated the email address.
+        user = await User.create({ name, email, googleId, isEmailVerified: true });
         return done(null, user);
 
       } catch (err) {
