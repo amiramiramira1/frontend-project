@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import i18next from 'i18next';
@@ -27,8 +27,6 @@ export const AuthProvider = ({ children }) => {
       toast.success(i18next.t('msg.welcomeBack', { name: data.user.name }));
       return data.user;
     } catch (err) {
-      const msg = err.response?.data?.message || i18next.t('msg.loginFailed');
-      toast.error(msg);
       throw err;
     } finally {
       setLoading(false);
@@ -44,8 +42,6 @@ export const AuthProvider = ({ children }) => {
       toast.success(i18next.t('msg.welcomeNew', { name: data.user.name }));
       return data.user;
     } catch (err) {
-      const msg = err.response?.data?.message || i18next.t('msg.registrationFailed');
-      toast.error(msg);
       throw err;
     } finally {
       setLoading(false);
@@ -90,6 +86,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ── UPDATE SETTINGS ──────────────────────────────────────────────
+  // Persists user preferences to the database (emailNotifications, language, defaultServings)
+  const updateSettings = async (updates) => {
+    setLoading(true);
+    try {
+      const { data } = await api.put('/auth/settings', updates);
+      const token = localStorage.getItem('boxify_token');
+      persistUser(data.user, token);
+      toast.success(i18next.t('msg.settingsSaved'));
+      return data.user;
+    } catch (err) {
+      const msg = err.response?.data?.message || i18next.t('msg.updateFailed');
+      toast.error(msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── CHANGE PASSWORD ──────────────────────────────────────────────
   const changePassword = async (currentPassword, newPassword) => {
     setLoading(true);
@@ -113,6 +128,36 @@ export const AuthProvider = ({ children }) => {
     window.location.href = `${backendURL}/api/auth/google`;
   };
 
+  // ── FORGOT PASSWORD ───────────────────────────────────────────────
+  const forgotPassword = async (email) => {
+    setLoading(true);
+    try {
+      await api.post('/auth/forgot-password', { email });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── RESET PASSWORD ────────────────────────────────────────────────
+  const resetPassword = async (token, password) => {
+    setLoading(true);
+    try {
+      await api.post('/auth/reset-password', { token, password });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── RESEND VERIFICATION ───────────────────────────────────────────
+  const resendVerification = async (email) => {
+    setLoading(true);
+    try {
+      await api.post('/auth/resend-verification', { email });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ── DELETE ACCOUNT ────────────────────────────────────────────────
   const deleteAccount = async () => {
     try {
@@ -132,7 +177,11 @@ export const AuthProvider = ({ children }) => {
       loading,
       refreshUser,
       updateProfile,
+      updateSettings,
       changePassword,
+      forgotPassword,
+      resetPassword,
+      resendVerification,
       isAdmin: user?.role === 'admin',
       loginWithGoogle,
       deleteAccount,

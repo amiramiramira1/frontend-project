@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
@@ -9,6 +10,27 @@ const generateToken = (userId) => {
     { expiresIn: process.env.JWT_EXPIRES_IN }
   );
 };
+
+// Helper: build the safe user payload sent to the frontend
+const userPayload = (user) => ({
+  id:              user._id,
+  name:            user.name,
+  email:           user.email,
+  role:            user.role,
+  addresses:       user.addresses,
+  dietPreferences: user.dietPreferences,
+  settings:        user.settings,
+  isEmailVerified: user.isEmailVerified,
+});
+
+// Helper: generate a secure random token, return [rawToken, hashedToken]
+const generateSecureToken = () => {
+  const raw = crypto.randomBytes(32).toString('hex');
+  const hash = crypto.createHash('sha256').update(raw).digest('hex');
+  return [raw, hash];
+};
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // @route   POST /api/auth/register
 // @access  Public
@@ -22,19 +44,29 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
-    // Create the user — password is auto-hashed by the pre-save hook in the model
-    const user = await User.create({ name, email, password });
+    // Generate email verification token
+    const [rawToken, hashedToken] = generateSecureToken();
 
-    // Respond with the user info and a token
+    // Create the user — password is auto-hashed by the pre-save hook in the model
+    const user = await User.create({
+      name,
+      email,
+      password,
+      emailVerifyToken:   hashedToken,
+      emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    });
+
+    // Fire-and-forget combined welcome + verification email
+    const emailService = require('../services/emailService');
+    const verifyUrl = `${FRONTEND_URL}/verify-email?token=${rawToken}`;
+    emailService.sendWelcomeVerificationEmail(user, verifyUrl).catch((err) =>
+      console.error('📧 Welcome/verify email failed:', err.message)
+    );
+
     res.status(201).json({
       message: 'User registered successfully',
       token: generateToken(user._id),
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      user: userPayload(user),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -62,12 +94,7 @@ const login = async (req, res) => {
     res.status(200).json({
       message: 'Login successful',
       token: generateToken(user._id),
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      user: userPayload(user),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -77,11 +104,9 @@ const login = async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private (requires token)
 const getMe = async (req, res) => {
-  // req.user is set by the auth middleware
   const user = await User.findById(req.user.id);
-  res.status(200).json({ user });
+  res.status(200).json({ user: userPayload(user) });
 };
-
 
 // @route   PUT /api/auth/profile
 // @access  Private
@@ -98,13 +123,34 @@ const updateProfile = async (req, res) => {
 
     res.status(200).json({
       message: 'Profile updated successfully',
-      user: {
-        id: updatedUser._id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        addresses: updatedUser.addresses,
-        dietPreferences: updatedUser.dietPreferences,
-      },
+      user: userPayload(updatedUser),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @route   PUT /api/auth/settings
+// @access  Private
+const updateSettings = async (req, res) => {
+  try {
+    const { emailNotifications, language, defaultServings } = req.body;
+
+    // Build update object — only include fields that were actually sent
+    const settingsUpdate = {};
+    if (emailNotifications !== undefined) settingsUpdate['settings.emailNotifications'] = emailNotifications;
+    if (language            !== undefined) settingsUpdate['settings.language']           = language;
+    if (defaultServings     !== undefined) settingsUpdate['settings.defaultServings']    = defaultServings;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: settingsUpdate },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      message: 'Settings updated successfully',
+      user: userPayload(updatedUser),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -155,5 +201,171 @@ const deleteAccount = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, changePassword, deleteAccount };
+// ─────────────────────────────────────────────────────────────────────────────
+// FORGOT / RESET PASSWORD
+// ─────────────────────────────────────────────────────────────────────────────
 
+// @route   POST /api/auth/forgot-password
+// @access  Public
+// Always returns 200 — never reveals whether the email exists (prevents enumeration)
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    // Respond identically whether user exists or not
+    if (!user) {
+      return res.status(200).json({
+        message: 'If an account with that email exists, a reset link has been sent.',
+      });
+    }
+
+    // Generate reset token
+    const [rawToken, hashedToken] = generateSecureToken();
+
+    user.passwordResetToken   = hashedToken;
+    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save({ validateBeforeSave: false });
+
+    // Fire-and-forget password reset email
+    const emailService = require('../services/emailService');
+    const resetUrl = `${FRONTEND_URL}/reset-password?token=${rawToken}`;
+    emailService.sendPasswordResetEmail(user, resetUrl).catch((err) =>
+      console.error('📧 Password reset email failed:', err.message)
+    );
+
+    res.status(200).json({
+      message: 'If an account with that email exists, a reset link has been sent.',
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Reset token is required' });
+    }
+
+    // Hash the raw token and compare to what we stored
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken:   hashedToken,
+      passwordResetExpires: { $gt: Date.now() }, // not expired
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'This reset link is invalid or has expired. Please request a new one.' });
+    }
+
+    // Set new password and clear the reset token fields
+    user.password             = password;
+    user.passwordResetToken   = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Your password has been reset successfully. You can now sign in.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL VERIFICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+// @route   GET /api/auth/verify-email?token=<raw>
+// @access  Public (navigated to directly from email link)
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      // Redirect to frontend with error flag
+      return res.redirect(`${FRONTEND_URL}/verify-email?error=missing`);
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      emailVerifyToken:   hashedToken,
+      emailVerifyExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.redirect(`${FRONTEND_URL}/verify-email?error=invalid`);
+    }
+
+    // Mark email as verified and clear the token
+    user.isEmailVerified  = true;
+    user.emailVerifyToken   = undefined;
+    user.emailVerifyExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    // Redirect to login with verified=true flag so the page shows a success banner
+    res.redirect(`${FRONTEND_URL}/login?verified=true`);
+  } catch (error) {
+    res.redirect(`${FRONTEND_URL}/verify-email?error=server`);
+  }
+};
+
+// @route   POST /api/auth/resend-verification
+// @access  Public
+const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email address is required' });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Always respond the same way to prevent enumeration
+    if (!user || user.isEmailVerified) {
+      return res.status(200).json({
+        message: 'If your email is registered and unverified, a new verification link has been sent.',
+      });
+    }
+
+    // Generate a fresh verification token
+    const [rawToken, hashedToken] = generateSecureToken();
+
+    user.emailVerifyToken   = hashedToken;
+    user.emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await user.save({ validateBeforeSave: false });
+
+    const emailService = require('../services/emailService');
+    const verifyUrl = `${FRONTEND_URL}/verify-email?token=${rawToken}`;
+    emailService.sendWelcomeVerificationEmail(user, verifyUrl).catch((err) =>
+      console.error('📧 Resend verification email failed:', err.message)
+    );
+
+    res.status(200).json({
+      message: 'If your email is registered and unverified, a new verification link has been sent.',
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  getMe,
+  updateProfile,
+  updateSettings,
+  changePassword,
+  deleteAccount,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
+  resendVerification,
+};

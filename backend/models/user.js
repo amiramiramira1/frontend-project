@@ -24,9 +24,13 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: false,           // Optional — OAuth users have no password
       minlength: [6, "Password must be at least 6 characters"],
-      select: false, // IMPORTANT: Never return password in queries by default
+      select: false,             // Never return password in queries by default
+    },
+    googleId: {
+      type: String,
+      default: null,             // Set when user signs in via Google OAuth
     },
     role: {
       type: String,
@@ -40,6 +44,21 @@ const userSchema = new mongoose.Schema(
         enum: ["vegan", "vegetarian", "keto", "paleo", "standard"],
       },
     ],
+    // User preferences — stored here so the backend can read them (e.g. email opt-out)
+    settings: {
+      emailNotifications: { type: Boolean, default: true },
+      language:           { type: String, enum: ['en', 'ar'], default: 'en' },
+      defaultServings:    { type: Number, min: 1, max: 10, default: 2 },
+    },
+
+    // Email verification
+    isEmailVerified:    { type: Boolean, default: false },
+    emailVerifyToken:   { type: String,  select: false }, // stored as sha256 hash
+    emailVerifyExpires: { type: Date,    select: false },
+
+    // Password reset
+    passwordResetToken:   { type: String, select: false }, // stored as sha256 hash
+    passwordResetExpires: { type: Date,   select: false },
   },
   { timestamps: true },
 );
@@ -48,8 +67,8 @@ const userSchema = new mongoose.Schema(
 // This runs BEFORE a user document is saved to the database.
 // It hashes the password if it was just set or changed.
 userSchema.pre("save", async function (next) {
-  // If the password hasn't been modified, skip hashing
-  if (!this.isModified("password")) return next();
+  // If the password hasn't been modified or doesn't exist (OAuth user), skip hashing
+  if (!this.isModified("password") || !this.password) return next();
 
   // Generate a salt (random data) and hash the password with it
   const salt = await bcrypt.genSalt(10);

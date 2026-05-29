@@ -100,3 +100,39 @@ exports.changePasswordValidator = [
       return true;
     }),
 ];
+
+// --- Update Settings ---
+exports.updateSettingsValidator = [
+  body('emailNotifications')
+    .optional()
+    .isBoolean().withMessage('emailNotifications must be a boolean'),
+
+  body('language')
+    .optional()
+    .isIn(['en', 'ar']).withMessage('language must be "en" or "ar"'),
+
+  body('defaultServings')
+    .optional()
+    .isInt({ min: 1, max: 10 }).withMessage('defaultServings must be an integer between 1 and 10'),
+];
+
+// --- Forgot Password ---
+exports.forgotPasswordValidator = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email address is required')
+    .isEmail().withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+];
+
+// --- Reset Password ---
+exports.resetPasswordValidator = [
+  body('token')
+    .notEmpty().withMessage('Reset token is required'),
+
+  body('password')
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 6, max: 100 }).withMessage('Password must be between 6 and 100 characters')
+    .matches(/\d/).withMessage('Password must contain at least one number')
+    .matches(/[a-zA-Z]/).withMessage('Password must contain at least one letter'),
+];
