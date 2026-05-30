@@ -1,15 +1,34 @@
-from fastapi import FastAPI
+"""
+Boxify AI Service — Gemini 2.0 Flash Function-Calling Agent
+============================================================
+A conversational AI assistant that can:
+  1. Answer FAQ questions about Boxify
+  2. Recommend boxes based on user preferences
+  3. Build custom boxes through interactive conversation
+  4. Add items to the user's cart
+  5. Create subscriptions
+
+Uses Google Gemini 2.0 Flash with native function calling (no LangChain).
+"""
+
+from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
-from groq import Groq
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 from pymongo import MongoClient
-import os, json, re, time
+from datetime import datetime, timedelta
+import os, json, httpx, time
 
 load_dotenv()
 
-app = FastAPI()
+# ─────────────────────────────────────────────────────────────────────────────
+# APP SETUP
+# ─────────────────────────────────────────────────────────────────────────────
+
+app = FastAPI(title="Boxify AI Service", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,323 +36,554 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+# ─────────────────────────────────────────────────────────────────────────────
+# GEMINI CLIENT
+# ─────────────────────────────────────────────────────────────────────────────
+
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+MODEL_ID = "gemini-2.0-flash"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MONGODB (for sessions + FAQ data)
+# ─────────────────────────────────────────────────────────────────────────────
 
 MONGO_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
+
 try:
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    db = client["boxify"]
-    client.admin.command('ping')
+    mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    db = mongo_client["boxify"]
+    mongo_client.admin.command('ping')
     print("✅ Connected to MongoDB")
+
+    # Create TTL index on chat_sessions — auto-delete after 7 days
+    db.chat_sessions.create_index("expiresAt", expireAfterSeconds=0)
 except Exception as e:
     print(f"❌ MongoDB error: {e}")
     db = None
 
-_cache = {"boxes": [], "meals": [], "prompt_text": "", "last_updated": 0}
-CACHE_TTL = 300
-
-def get_cached_data():
-    now = time.time()
-    if now - _cache["last_updated"] > CACHE_TTL or not _cache["prompt_text"]:
-        _cache["boxes"]        = _fetch_boxes()
-        _cache["meals"]        = _fetch_meals()
-        _cache["prompt_text"]  = _build_prompt_text(_cache["boxes"], _cache["meals"])
-        _cache["last_updated"] = now
-        print(f"🔄 Cache refresh — {len(_cache['boxes'])} boxes, {len(_cache['meals'])} meals")
-        if _cache["boxes"]:
-            print("📦 Boxes found:", [b.get('name') for b in _cache["boxes"]])
-        else:
-            print("⚠️ No boxes found in DB!")
-        if _cache["meals"]:
-            print("🍽️ Meals found:", [m.get('name') for m in _cache["meals"]])
-        else:
-            print("⚠️ No meals found in DB!")
-    return _cache["boxes"], _cache["meals"], _cache["prompt_text"]
-
-def _fetch_boxes():
-    try:
-        if db is None:  # ✅ FIX
-            print("❌ DB is None")
-            return []
-        count = db.boxes.count_documents({})
-        print(f"📦 Total boxes in DB: {count}")
-        boxes = list(db.boxes.find({}, {
-            "_id":1,"name":1,"description":1,"dietType":1,"basePrice":1,"isActive":1
-        }))
-        for b in boxes:
-            b["_id"] = str(b["_id"])
-        print(f"📦 Fetched {len(boxes)} boxes")
-        return boxes
-    except Exception as e:
-        print(f"❌ fetch_boxes error: {e}")
-        return []
-
-def _fetch_meals():
-    try:
-        if db is None:  # ✅ FIX
-            print("❌ DB is None")
-            return []
-        count = db.meals.count_documents({})
-        print(f"🍽️ Total meals in DB: {count}")
-        meals = list(db.meals.find({}, {
-            "_id":1,"name":1,"description":1,"dietType":1,
-            "pricePerServing":1,"caloriesPerServing":1,"allergens":1
-        }))
-        for m in meals:
-            m["_id"] = str(m["_id"])
-        print(f"🍽️ Fetched {len(meals)} meals")
-        return meals
-    except Exception as e:
-        print(f"❌ fetch_meals error: {e}")
-        return []
-
-def _build_prompt_text(boxes, meals):
-    if not boxes and not meals:
-        return "No data available in database."
-    text = "=== BOXES ===\n"
-    for b in boxes:
-        text += f"- {b.get('name','')} | diet: {b.get('dietType','')} | price: {b.get('basePrice',0)} EGP"
-        if b.get('description'): text += f" | {b['description']}"
-        text += "\n"
-    text += "\n=== MEALS ===\n"
-    for m in meals:
-        allergens = ', '.join(m.get('allergens', [])) if m.get('allergens') else 'none'
-        text += (f"- {m.get('name','')} | diet: {m.get('dietType','')} "
-                 f"| {m.get('pricePerServing',0)} EGP/serving "
-                 f"| {m.get('caloriesPerServing',0)} cal "
-                 f"| allergens: {allergens}\n")
-    return text
-
-def clean_response(text: str) -> str:
-    cleaned = re.sub(
-        r'[^\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF'
-        r'a-zA-Z0-9\s\n\.,!?؟،؛:\-\(\)\[\]\'\"\/'
-        r'🍱🤖🥗🥩🐟🍗🥚🥑🎉✅⚠️💪⚖️😊😅🛒🔄📦🍽️💰👥🎯●✨#*]',
-        '', text
-    )
-    return cleaned.strip()
-
-def call_groq(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
-    response = groq_client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_message}
-        ],
-        max_tokens=max_tokens,
-        temperature=0.7
-    )
-    return response.choices[0].message.content or ""
-
-sessions: dict = {}
-
-def get_session(session_id: str, language: str = "ar") -> dict:
-    key = f"{session_id}_{language}"
-    if key not in sessions:
-        sessions[key] = {"language": language, "history": []}
-    return sessions[key]
+# ─────────────────────────────────────────────────────────────────────────────
+# FAQ DATASET
+# ─────────────────────────────────────────────────────────────────────────────
 
 dataset: list = []
 dataset_path = os.path.join(os.path.dirname(__file__), '..', 'backend', 'dataset.json')
 if os.path.exists(dataset_path):
     with open(dataset_path, 'r', encoding='utf-8') as f:
         dataset = json.load(f)
-    print(f"✅ Dataset loaded: {len(dataset)} items")
+    print(f"✅ FAQ dataset loaded: {len(dataset)} items")
 else:
     print("⚠️ dataset.json not found")
 
-def find_in_dataset(question: str, language: str = "ar") -> Optional[str]:
-    q = question.lower().strip()
-    if len(q) < 4: return None
+
+def search_faq(query: str, language: str = "ar") -> Optional[str]:
+    """Search the FAQ dataset for matching answers."""
+    q = query.lower().strip()
+    if len(q) < 4:
+        return None
+
+    best_match = None
+    best_score = 0
+
     for item in dataset:
         en = (item.get('question_en') or '').lower()
         ar = (item.get('question_ar') or '').lower()
-        if q in en or en in q or q in ar or ar in q:
+
+        # Simple keyword matching with scoring
+        score = 0
+        q_words = set(q.split())
+
+        for word in q_words:
+            if len(word) >= 3:  # Skip very short words
+                if word in en:
+                    score += 1
+                if word in ar:
+                    score += 1
+
+        # Exact substring match gets high score
+        if q in en or en in q:
+            score += 10
+        if q in ar or ar in q:
+            score += 10
+
+        if score > best_score:
             answer = (item.get('answer_ar') if language != 'en'
                       else (item.get('answer') or item.get('answer_ar')))
             val = str(answer or '').strip()
-            if val and val != 'nan': return val
-    return None
+            if val and val != 'nan' and val:
+                best_score = score
+                best_match = val
+
+    return best_match if best_score >= 2 else None
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOOL DEFINITIONS (Gemini Function Declarations)
+# ─────────────────────────────────────────────────────────────────────────────
+
+TOOL_DECLARATIONS = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="search_faq",
+            description="Search the Boxify FAQ/knowledge base for answers about policies, delivery, subscriptions, payment, cancellations, serving sizes, and other business questions.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "query": types.Schema(type="STRING", description="The user's question about Boxify")
+                },
+                required=["query"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="recommend_box",
+            description="Find pre-made boxes matching user preferences. Returns box cards with name, price, diet type, and image. Use when user wants a box recommendation.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "dietType": types.Schema(type="STRING", description="Diet type filter: vegan, vegetarian, keto, paleo, standard"),
+                    "maxPrice": types.Schema(type="NUMBER", description="Maximum price in EGP"),
+                },
+            )
+        ),
+        types.FunctionDeclaration(
+            name="get_available_meals",
+            description="List meals available for building a custom box. Use when user wants to build their own box or see available meals.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "dietType": types.Schema(type="STRING", description="Filter by diet type: vegan, vegetarian, keto, paleo, standard"),
+                },
+            )
+        ),
+        types.FunctionDeclaration(
+            name="create_custom_box",
+            description="Create a custom box from selected meal IDs. Call ONLY after the user has reviewed and confirmed their meal selection, serving size, and whether they want one-time or subscription.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "mealIds": types.Schema(type="ARRAY", items=types.Schema(type="STRING"), description="Array of meal ID strings"),
+                    "name": types.Schema(type="STRING", description="Optional custom name for the box"),
+                },
+                required=["mealIds"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="add_to_cart",
+            description="Add a box to the user's shopping cart. Use after recommending a box or creating a custom box, when the user confirms they want it.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "boxId": types.Schema(type="STRING", description="The box ID to add"),
+                    "servingSize": types.Schema(type="NUMBER", description="Serving size: 1, 2, 4, or 6"),
+                    "quantity": types.Schema(type="NUMBER", description="Number of boxes to add, default 1"),
+                },
+                required=["boxId", "servingSize"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="create_subscription",
+            description="Create a recurring subscription for a box. Use when user explicitly wants a subscription (weekly or monthly delivery).",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "boxId": types.Schema(type="STRING", description="The box ID to subscribe to"),
+                    "servingSize": types.Schema(type="NUMBER", description="Serving size: 1, 2, 4, or 6"),
+                    "frequency": types.Schema(type="STRING", description="Delivery frequency: weekly or monthly"),
+                },
+                required=["boxId", "servingSize", "frequency"]
+            )
+        ),
+    ]
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOOL EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def execute_tool(tool_name: str, args: dict, user_token: str = None, language: str = "ar") -> dict:
+    """Execute a tool call by either searching locally or calling the Node.js API."""
+
+    if tool_name == "search_faq":
+        result = search_faq(args.get("query", ""), language)
+        if result:
+            return {"found": True, "answer": result}
+        return {"found": False, "message": "No FAQ answer found for this question."}
+
+    # All other tools require calling the Node.js backend
+    headers = {}
+    if user_token:
+        headers["Authorization"] = f"Bearer {user_token}"
+    headers["Content-Type"] = "application/json"
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            if tool_name == "recommend_box":
+                params = {}
+                if args.get("dietType"):
+                    params["dietType"] = args["dietType"]
+                if args.get("maxPrice"):
+                    params["maxPrice"] = str(args["maxPrice"])
+                resp = await client.get(f"{BACKEND_URL}/api/boxes/recommended", headers=headers, params=params)
+                data = resp.json()
+                # Simplify the response for Gemini
+                boxes = data.get("boxes", [])
+                return {
+                    "boxes": [
+                        {
+                            "id": b.get("_id"),
+                            "name": b.get("name"),
+                            "description": b.get("description", ""),
+                            "dietType": b.get("dietType"),
+                            "price": b.get("priceForServing") or b.get("basePrice"),
+                            "image": b.get("image", ""),
+                            "meals": [m.get("name") for m in (b.get("meals") or [])],
+                        }
+                        for b in boxes[:6]
+                    ],
+                    "count": len(boxes),
+                }
+
+            elif tool_name == "get_available_meals":
+                # Fetch meals directly from MongoDB for speed
+                if db is not None:
+                    query_filter = {}
+                    if args.get("dietType"):
+                        query_filter["dietType"] = args["dietType"]
+                    meals = list(db.meals.find(query_filter, {
+                        "_id": 1, "name": 1, "description": 1, "dietType": 1,
+                        "pricePerServing": 1, "caloriesPerServing": 1, "allergens": 1
+                    }))
+                    return {
+                        "meals": [
+                            {
+                                "id": str(m["_id"]),
+                                "name": m.get("name"),
+                                "description": m.get("description", ""),
+                                "dietType": m.get("dietType"),
+                                "price": m.get("pricePerServing"),
+                                "calories": m.get("caloriesPerServing"),
+                                "allergens": m.get("allergens", []),
+                            }
+                            for m in meals
+                        ],
+                        "count": len(meals),
+                    }
+                return {"meals": [], "error": "Database unavailable"}
+
+            elif tool_name == "create_custom_box":
+                if not user_token:
+                    return {"error": "User must be logged in to create a box"}
+                payload = {"meals": args["mealIds"]}
+                if args.get("name"):
+                    payload["name"] = args["name"]
+                resp = await client.post(f"{BACKEND_URL}/api/boxes/custom", headers=headers, json=payload)
+                data = resp.json()
+                if resp.status_code >= 400:
+                    return {"error": data.get("message", "Failed to create box")}
+                box = data.get("box", {})
+                return {
+                    "success": True,
+                    "boxId": str(box.get("_id", "")),
+                    "name": box.get("name", ""),
+                    "price": data.get("priceForServing") or box.get("basePrice", 0),
+                }
+
+            elif tool_name == "add_to_cart":
+                if not user_token:
+                    return {"error": "User must be logged in to add to cart"}
+                payload = {
+                    "boxId": args["boxId"],
+                    "servingSize": int(args["servingSize"]),
+                    "quantity": int(args.get("quantity", 1)),
+                }
+                resp = await client.post(f"{BACKEND_URL}/api/cart/items", headers=headers, json=payload)
+                data = resp.json()
+                if resp.status_code >= 400:
+                    return {"error": data.get("message", "Failed to add to cart")}
+                return {
+                    "success": True,
+                    "message": data.get("message", "Added to cart"),
+                    "cartTotal": data.get("cart", {}).get("cartTotal", 0),
+                }
+
+            elif tool_name == "create_subscription":
+                if not user_token:
+                    return {"error": "User must be logged in to create a subscription"}
+                payload = {
+                    "boxId": args["boxId"],
+                    "servingSize": int(args["servingSize"]),
+                    "frequency": args["frequency"],
+                }
+                resp = await client.post(f"{BACKEND_URL}/api/subscriptions", headers=headers, json=payload)
+                data = resp.json()
+                if resp.status_code >= 400:
+                    return {"error": data.get("message", "Failed to create subscription")}
+                return {
+                    "success": True,
+                    "message": data.get("message", "Subscription created"),
+                    "subscriptionId": str(data.get("subscription", {}).get("_id", "")),
+                }
+
+            else:
+                return {"error": f"Unknown tool: {tool_name}"}
+
+        except httpx.TimeoutException:
+            return {"error": "Backend request timed out"}
+        except Exception as e:
+            return {"error": f"Tool execution failed: {str(e)}"}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SESSION MANAGEMENT (MongoDB-backed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_session_history(session_id: str) -> list:
+    """Retrieve conversation history from MongoDB."""
+    if db is None:
+        return []
+    session = db.chat_sessions.find_one({"sessionId": session_id})
+    if not session:
+        return []
+    return session.get("messages", [])
+
+
+def save_session_message(session_id: str, role: str, content: str, user_id: str = None,
+                         tool_call: dict = None, tool_result: dict = None):
+    """Append a message to the session in MongoDB."""
+    if db is None:
+        return
+
+    message = {
+        "role": role,
+        "content": content,
+        "timestamp": datetime.utcnow(),
+    }
+    if tool_call:
+        message["toolCall"] = tool_call
+    if tool_result:
+        message["toolResult"] = tool_result
+
+    db.chat_sessions.update_one(
+        {"sessionId": session_id},
+        {
+            "$push": {"messages": message},
+            "$set": {
+                "updatedAt": datetime.utcnow(),
+                "expiresAt": datetime.utcnow() + timedelta(days=7),
+            },
+            "$setOnInsert": {
+                "sessionId": session_id,
+                "userId": user_id,
+                "createdAt": datetime.utcnow(),
+            },
+        },
+        upsert=True,
+    )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SYSTEM PROMPT
+# ─────────────────────────────────────────────────────────────────────────────
+
+SYSTEM_PROMPT_EN = """You are Boxify Chef 🥕, a friendly AI assistant for Boxify — an Egyptian meal kit delivery service.
+
+YOUR CAPABILITIES:
+1. **FAQ**: Answer questions about Boxify policies, delivery, subscriptions, payment, etc. Use the search_faq tool first.
+2. **Recommend Boxes**: Suggest existing pre-made boxes based on user preferences using recommend_box tool.
+3. **Build Custom Box**: Guide users through creating a custom meal box:
+   - Ask about diet preferences and allergies
+   - Show available meals using get_available_meals tool
+   - Let them pick meals
+   - Ask about serving size (1, 2, 4, or 6 people)
+   - Ask if they want one-time purchase or subscription (weekly/monthly)
+   - Create the box using create_custom_box, then add to cart with add_to_cart
+   - If subscription, also call create_subscription
+
+IMPORTANT RULES:
+- Be warm, friendly, and concise (2-4 sentences per response)
+- Reply in English
+- When recommending boxes or meals, present them clearly with names and prices
+- NEVER invent box or meal names — only use data from tools
+- When user wants to add something to cart, always confirm the serving size first
+- For build-a-box flow, guide step by step — don't rush
+- If user is not logged in and tries to use cart/box features, tell them to sign in first
+- If question is not about food or Boxify, politely say you can only help with Boxify
+- When presenting boxes from recommend_box results, include the box ID so the frontend can render cards
+- Format box recommendations as: **Box Name** — description, price, diet type"""
+
+SYSTEM_PROMPT_AR = """أنت Boxify Chef 🥕، مساعد ذكي ودود لـ Boxify — موقع مصري لتوصيل أكل صحي طازج.
+
+قدراتك:
+1. **أسئلة عامة**: رد على أسئلة عن سياسات Boxify والتوصيل والاشتراكات والدفع. استخدم search_faq الأول.
+2. **اقتراح بوكسات**: اقترح بوكسات جاهزة بناءً على تفضيلات المستخدم باستخدام recommend_box.
+3. **بناء بوكس مخصص**: ساعد المستخدم يبني بوكس خاص:
+   - اسأل عن نوع الأكل والحساسيات
+   - اعرض الوجبات المتاحة باستخدام get_available_meals
+   - خليه يختار الوجبات
+   - اسأل عن حجم التقديم (1, 2, 4, أو 6 أشخاص)
+   - اسأل لو عايز مرة واحدة أو اشتراك (أسبوعي/شهري)
+   - ابني البوكس بـ create_custom_box وأضفه للسلة بـ add_to_cart
+   - لو اشتراك، استخدم create_subscription كمان
+
+قواعد مهمة:
+- كن ودود ومختصر (2-4 جمل في كل رد) بالعربي المصري
+- لما تقترح بوكسات أو وجبات، اعرضها بوضوح بالأسماء والأسعار
+- متخترعش أسماء — استخدم بس البيانات من الأدوات
+- لما المستخدم عايز يضيف حاجة للسلة، أكد حجم التقديم الأول
+- لو المستخدم مش مسجل دخول وعايز يستخدم السلة، قله يسجل دخول الأول
+- لو السؤال مش عن أكل أو Boxify، قول بلطف إنك بتساعد في Boxify بس
+- لما تعرض بوكسات من recommend_box، اذكر الـ box ID عشان الواجهة تقدر تعرض كروت
+- شكل اقتراح البوكسات: **اسم البوكس** — الوصف، السعر، نوع الدايت"""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REQUEST / RESPONSE MODELS
+# ─────────────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     message:    str
     session_id: Optional[str] = Field(default="default", alias="sessionId")
     language:   Optional[str] = "ar"
+    user_token: Optional[str] = Field(default=None, alias="userToken")
     model_config = {"populate_by_name": True}
 
-class RecommendationRequest(BaseModel):
-    diet:      Optional[str] = ""
-    goal:      Optional[str] = ""
-    people:    Optional[str] = ""
-    budget:    Optional[str] = ""
-    allergies: Optional[str] = ""
-    language:  Optional[str] = "ar"
-    mode:      Optional[str] = "boxes"
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN CHAT ENDPOINT
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def root():
-    return {"message": "Boxify AI is running 🍱"}
+    return {"message": "Boxify AI Service v2.0 🥕", "model": MODEL_ID}
 
-@app.get("/boxes")
-def get_boxes():
-    boxes, _, _ = get_cached_data()
-    return {"boxes": boxes}
-
-@app.get("/meals")
-def get_meals():
-    _, meals, _ = get_cached_data()
-    return {"meals": meals}
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
-        dataset_answer = find_in_dataset(req.message, req.language)
-        if dataset_answer:
-            return {"answer": dataset_answer, "source": "dataset"}
-
-        _, _, prompt_text = get_cached_data()
-        sid  = req.session_id or "default"
         lang = req.language or "ar"
-        session = get_session(sid, lang)
+        sid = req.session_id or "default"
+        user_token = req.user_token
 
-        if "No data available" in prompt_text:
-            if lang == "en":
-                return {"answer": "Sorry, our menu data is currently unavailable. Please try again later! 😅", "source": "error"}
-            return {"answer": "معلش، بياناتنا مش متاحة دلوقتي. حاولي تاني بعدين! 😅", "source": "error"}
+        # Build conversation history from MongoDB
+        history = get_session_history(sid)
 
-        history_text = ""
-        for h in session["history"][-6:]:
-            if lang == "en":
-                history_text += f"User: {h['user']}\nAssistant: {h['assistant']}\n\n"
-            else:
-                history_text += f"العميل: {h['user']}\nالمساعد: {h['assistant']}\n\n"
+        # Convert history to Gemini message format
+        gemini_history = []
+        for msg in history[-10:]:  # Keep last 10 messages for context
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "user":
+                gemini_history.append(types.Content(role="user", parts=[types.Part.from_text(text=content)]))
+            elif role == "model":
+                gemini_history.append(types.Content(role="model", parts=[types.Part.from_text(text=content)]))
 
-        if lang == "en":
-            system = f"""You are a helpful assistant for Boxify, an Egyptian meal kit delivery service.
+        # Select system prompt based on language
+        system_prompt = SYSTEM_PROMPT_EN if lang == "en" else SYSTEM_PROMPT_AR
 
-BOXIFY DATA (use ONLY these items, never invent names):
-{prompt_text}
+        # Build the config with system instruction and tools
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            tools=[TOOL_DECLARATIONS],
+            temperature=0.7,
+            max_output_tokens=800,
+        )
 
-RULES:
-- Reply in English only, max 3-4 sentences
-- ONLY recommend boxes and meals that exist EXACTLY in the data above
-- Never invent box or meal names
-- Be friendly and direct
-- If question is not about Boxify or food, say you only help with Boxify"""
-            user_msg = f"{history_text}User: {req.message}\nAssistant:"
-        else:
-            system = f"""أنت مساعد ذكي لـ Boxify، موقع مصري لتوصيل أكل صحي طازج.
+        # Save user message to session
+        save_session_message(sid, "user", req.message)
 
-بيانات Boxify (استخدم بس الحاجات دي، متخترعش أسماء):
-{prompt_text}
+        # Add the new user message
+        gemini_history.append(types.Content(role="user", parts=[types.Part.from_text(text=req.message)]))
 
-قواعد مهمة جداً:
-- رد بالعربي المصري بس، مختصر ومباشر (3-4 جمل)
-- اقترح بس بوكسات ووجبات موجودة في البيانات فوق بالاسم بالظبط
-- متخترعش أي اسم بوكس أو وجبة مش موجود في البيانات
-- كن ودود"""
-            user_msg = f"{history_text}العميل: {req.message}\nالمساعد:"
+        # ReAct loop: keep calling Gemini until we get a text response
+        max_iterations = 5
+        tool_calls_made = []
 
-        answer = clean_response(call_groq(system, user_msg))
-        if not answer:
-            raise ValueError("empty response")
+        for iteration in range(max_iterations):
+            response = gemini_client.models.generate_content(
+                model=MODEL_ID,
+                contents=gemini_history,
+                config=config,
+            )
 
-        session["history"].append({"user": req.message, "assistant": answer})
-        return {"answer": answer, "source": "groq"}
+            candidate = response.candidates[0]
+            parts = candidate.content.parts
+
+            # Check if there are function calls in the response
+            function_calls = [p for p in parts if p.function_call]
+
+            if not function_calls:
+                # No function calls — we have a text response
+                text_parts = [p.text for p in parts if p.text]
+                answer = " ".join(text_parts).strip()
+
+                if not answer:
+                    answer = "Sorry, I couldn't process that. Could you rephrase?" if lang == "en" else "معلش، مش فاهم. ممكن تقول تاني؟"
+
+                # Save assistant response
+                save_session_message(sid, "model", answer)
+
+                return {
+                    "answer": answer,
+                    "source": "gemini",
+                    "toolCalls": tool_calls_made,
+                }
+
+            # Process function calls
+            # Add the model's response (with function calls) to history
+            gemini_history.append(candidate.content)
+
+            # Execute each function call and build response parts
+            function_response_parts = []
+            for part in function_calls:
+                fc = part.function_call
+                tool_name = fc.name
+                tool_args = dict(fc.args) if fc.args else {}
+
+                print(f"🔧 Tool call: {tool_name}({json.dumps(tool_args, default=str)})")
+
+                # Execute the tool
+                result = await execute_tool(tool_name, tool_args, user_token, lang)
+                tool_calls_made.append({
+                    "tool": tool_name,
+                    "args": tool_args,
+                    "result": result,
+                })
+
+                print(f"✅ Tool result: {json.dumps(result, default=str)[:200]}")
+
+                # Save tool interaction
+                save_session_message(sid, "tool", json.dumps(result, default=str),
+                                     tool_call={"name": tool_name, "args": tool_args})
+
+                # Build function response part
+                function_response_parts.append(
+                    types.Part.from_function_response(
+                        name=tool_name,
+                        response=result,
+                    )
+                )
+
+            # Add function results back to conversation
+            gemini_history.append(types.Content(role="user", parts=function_response_parts))
+
+        # If we hit max iterations, return what we have
+        return {
+            "answer": "I'm having trouble processing your request. Could you try again?" if lang == "en"
+                      else "في مشكلة صغيرة، ممكن تحاول تاني؟",
+            "source": "error",
+            "toolCalls": tool_calls_made,
+        }
 
     except Exception as e:
-        print(f"Chat error: {e}")
-        if (req.language or "ar") == "en":
-            return {"answer": "Sorry, something went wrong. Please try again! 😅", "source": "error"}
-        return {"answer": "معلش حصلت مشكلة صغيرة، ممكن تعيد السؤال؟ 😅", "source": "error"}
-
-@app.post("/recommend")
-async def recommend(req: RecommendationRequest):
-    try:
-        _, _, prompt_text = get_cached_data()
+        print(f"❌ Chat error: {e}")
+        import traceback
+        traceback.print_exc()
         lang = req.language or "ar"
+        return {
+            "answer": "Sorry, something went wrong. Please try again! 😅" if lang == "en"
+                      else "معلش حصلت مشكلة صغيرة، ممكن تعيد السؤال؟ 😅",
+            "source": "error",
+        }
 
-        if "No data available" in prompt_text:
-            if lang == "en":
-                return {"recommendation": "Sorry, menu data is unavailable right now. Please try again later! 😅", "source": "error"}
-            return {"recommendation": "معلش، بياناتنا مش متاحة دلوقتي. حاولي تاني بعدين! 😅", "source": "error"}
-
-        if req.mode == "build":
-            if lang == "en":
-                system = f"""You are a Boxify meal planner.
-AVAILABLE MEALS (use ONLY these exact names, never invent):
-{prompt_text}
-
-Rules:
-- Suggest 3-5 meals using EXACT names from the list only
-- Format each line: meal name — reason — price
-- End with total estimated price
-- English only, be concise"""
-                user_msg = (f"Suggest meals: diet={req.diet or 'any'}, goal={req.goal or 'general'}, "
-                            f"people={req.people or '2'}, budget={req.budget or 'medium'}, "
-                            f"allergies={req.allergies or 'none'}")
-            else:
-                system = f"""أنت مخطط وجبات Boxify.
-الوجبات المتاحة فقط (استخدم الأسماء بالظبط، لا تخترع):
-{prompt_text}
-
-قواعد مهمة:
-- اقترح 3-5 وجبات من القائمة بس بالاسم بالظبط كما هو مكتوب
-- كل سطر: اسم الوجبة — سبب قصير — السعر
-- في الآخر وضح السعر الإجمالي التقريبي
-- عربي مصري بس، مختصر"""
-                user_msg = (f"اقترح وجبات: نوع={req.diet or 'أي'}, هدف={req.goal or 'عام'}, "
-                            f"أشخاص={req.people or '2'}, ميزانية={req.budget or 'متوسطة'}, "
-                            f"حساسيات={req.allergies or 'مفيش'}")
-        else:
-            if lang == "en":
-                system = f"""You are a Boxify assistant.
-AVAILABLE BOXES (use ONLY these exact names, never invent):
-{prompt_text}
-
-Rules:
-- Recommend exactly ONE box using its EXACT name from the list
-- Format:
-  ✅ Box: [exact name from list]
-  Why: [1-2 sentences]
-  Includes meals like: [examples from data only]
-  Price: [from data]
-- English only"""
-                user_msg = (f"Recommend a box: diet={req.diet or 'any'}, goal={req.goal or 'general'}, "
-                            f"people={req.people or '2'}, budget={req.budget or 'medium'}, "
-                            f"allergies={req.allergies or 'none'}")
-            else:
-                system = f"""أنت مساعد Boxify.
-البوكسات المتاحة فقط (استخدم الأسماء بالظبط، لا تخترع أي اسم):
-{prompt_text}
-
-قواعد مهمة جداً:
-- اقترح بوكس واحد بالظبط موجود في القائمة فوق
-- استخدم اسم البوكس بالظبط كما هو مكتوب في القائمة
-- متخترعش أي اسم مش موجود في القائمة
-- الشكل:
-  ✅ البوكس: [الاسم بالظبط من القائمة]
-  ليه: [جملة أو جملتين]
-  فيه وجبات زي: [أمثلة من البيانات بس]
-  السعر: [من البيانات]
-- عربي مصري بس"""
-                user_msg = (f"اقترح بوكس: نوع={req.diet or 'أي'}, هدف={req.goal or 'عام'}, "
-                            f"أشخاص={req.people or '2'}, ميزانية={req.budget or 'متوسطة'}, "
-                            f"حساسيات={req.allergies or 'مفيش'}")
-
-        result = clean_response(call_groq(system, user_msg, max_tokens=450))
-        if not result:
-            raise ValueError("empty response")
-        return {"recommendation": result, "source": "groq"}
-
-    except Exception as e:
-        print(f"Recommendation error: {e}")
-        if (req.language or "ar") == "en":
-            return {"recommendation": "Sorry, couldn't get a recommendation. Please try again! 😅", "source": "error"}
-        return {"recommendation": "معلش مقدرناش نوصلك باقتراح، حاولي تاني 😅", "source": "error"}
 
 @app.delete("/session/{session_id}")
 async def clear_session(session_id: str):
-    keys_to_delete = [k for k in sessions if k.startswith(session_id)]
-    for k in keys_to_delete: del sessions[k]
-    return {"message": "تم مسح المحادثة"}
+    """Clear a chat session's history."""
+    if db is not None:
+        db.chat_sessions.delete_one({"sessionId": session_id})
+    return {"message": "Session cleared"}

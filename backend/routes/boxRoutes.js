@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getBoxes, getBox, createBox, createCustomBox, updateBox, deleteBox, calculateCustomBox
+  getBoxes, getBox, createBox, createCustomBox, updateBox, deleteBox, calculateCustomBox, getRecommendedBoxes
 } = require('../controllers/boxController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, optionalProtect } = require('../middleware/authMiddleware');
 const { adminOnly } = require('../middleware/adminMiddleware');
 const validate = require('../middleware/validate');
 const {
@@ -20,6 +20,7 @@ router.route('/')
 
 router.post('/custom/calculate', protect, calculateCustomBoxValidator, validate, calculateCustomBox);
 router.post('/custom', protect, createCustomBoxValidator, validate, createCustomBox);
+router.get('/recommended', optionalProtect, getRecommendedBoxes);
 
 router.route('/:id')
   .get(getBox)

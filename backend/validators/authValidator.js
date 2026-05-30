@@ -80,6 +80,14 @@ exports.updateProfileValidator = [
   body('dietPreferences.*')
     .isIn(['vegan', 'vegetarian', 'keto', 'paleo', 'standard'])
     .withMessage('Each diet preference must be one of: vegan, vegetarian, keto, paleo, standard'),
+
+  body('allergens')
+    .optional()
+    .isArray().withMessage('Allergens must be an array'),
+
+  body('allergens.*')
+    .isIn(['gluten', 'dairy', 'nuts', 'eggs', 'soy', 'shellfish', 'fish'])
+    .withMessage('Each allergen must be one of: gluten, dairy, nuts, eggs, soy, shellfish, fish'),
 ];
 
 // --- Change Password ---

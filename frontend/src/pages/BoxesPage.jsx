@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import api from '../api/axios';
 import BoxCard from '../components/BoxCard';
-import Recommendation from '../components/Recommendation';
-import { Search, X, GitCompareArrows, Sparkles } from 'lucide-react';
+import { Search, X, GitCompareArrows } from 'lucide-react';
 
 const dietFilters = [
   { value: 'all',        label: 'All' },
@@ -23,7 +22,6 @@ export default function BoxesPage() {
   const [search, setSearch] = useState('');
   const [selectedDiet, setSelectedDiet] = useState('all');
   const [compareIds, setCompareIds] = useState([]);
-  const [showRecommendation, setShowRecommendation] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -76,26 +74,6 @@ export default function BoxesPage() {
         <meta name="description" content="Browse all our curated meal boxes. Fresh ingredients delivered weekly across Egypt." />
       </Helmet>
 
-      {/* Recommendation Panel */}
-      {showRecommendation && (
-        <Recommendation
-          onClose={() => setShowRecommendation(false)}
-          mode="boxes"
-        />
-      )}
-
-      {/* Overlay */}
-      {showRecommendation && (
-        <div
-          onClick={() => setShowRecommendation(false)}
-          style={{
-            position: 'fixed', inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            zIndex: 999
-          }}
-        />
-      )}
-
       {/* Header */}
       <div className="bg-white border-b border-gray-100">
         <div className="page-container py-6">
@@ -104,15 +82,6 @@ export default function BoxesPage() {
               <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">Meal Boxes</h1>
               <p className="text-gray-500">Curated collections of fresh, pre-portioned ingredients</p>
             </div>
-            {/* زرار الـ AI Recommendation */}
-            <button
-              onClick={() => setShowRecommendation(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg hover:scale-105 w-fit"
-              style={{ background: 'linear-gradient(135deg, #1b5e20, #43a047)' }}
-            >
-              <Sparkles className="w-4 h-4" />
-              🤖 لاقيلي بوكس
-            </button>
           </div>
         </div>
       </div>

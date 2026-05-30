@@ -5,8 +5,7 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
-import { Search, Plus, Minus, ShoppingCart, Flame, Repeat, Bookmark, BookmarkCheck, Trash2, Sparkles } from 'lucide-react';
-import Recommendation from '../components/Recommendation';
+import { Search, Plus, Minus, ShoppingCart, Flame, Repeat, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react';
 
 const dietFilters = ['All', 'vegetarian', 'vegan', 'keto', 'paleo', 'standard'];
 const servingOptions = [1, 2, 4, 6];
@@ -37,7 +36,7 @@ export default function BuildBoxPage() {
   const [boxName, setBoxName] = useState('My Custom Box');
   const [savedBoxes, setSavedBoxes] = useState(loadSavedBoxes);
   const [saving, setSaving] = useState(false);
-  const [showRecommendation, setShowRecommendation] = useState(false);
+
 
   useEffect(() => { localStorage.setItem('preferred_diet', dietFilter); }, [dietFilter]);
 
@@ -46,25 +45,6 @@ export default function BuildBoxPage() {
       .then(({ data }) => {
         const loadedMeals = data.meals || [];
         setMeals(loadedMeals);
-
-        // ── FIX: لو في وجبات مقترحة من الـ Recommendation، حطيها ──
-        const pending = localStorage.getItem('pending_recommended_meals');
-        if (pending) {
-          try {
-            const recommendedIds = JSON.parse(pending);
-            const newSelected = {};
-            recommendedIds.forEach(id => {
-              if (loadedMeals.find(m => m._id === id)) {
-                newSelected[id] = 1;
-              }
-            });
-            if (Object.keys(newSelected).length > 0) {
-              setSelected(newSelected);
-              toast.success(`${Object.keys(newSelected).length} وجبات اتضافوا لبوكسك! 🎉`);
-            }
-          } catch {}
-          localStorage.removeItem('pending_recommended_meals');
-        }
       })
       .catch(() => toast.error('Failed to load meals'))
       .finally(() => setLoading(false));
@@ -177,21 +157,6 @@ export default function BuildBoxPage() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── FIX: Recommendation مرة واحدة بس ── */}
-      {showRecommendation && (
-        <Recommendation
-          onClose={() => setShowRecommendation(false)}
-          mode="build"
-          onMealsSelected={(suggestedMeals) => {
-            const newSelected = {};
-            suggestedMeals.forEach(m => { if (m._id) newSelected[m._id] = 1; });
-            setSelected(newSelected);
-            setShowRecommendation(false);
-            toast.success(`${suggestedMeals.length} وجبات اتضافوا لبوكسك! 🎉`);
-          }}
-        />
-      )}
-
       <div className="bg-white border-b border-gray-100">
         <div className="page-container py-10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -199,14 +164,9 @@ export default function BuildBoxPage() {
               <h1 className="font-display text-4xl font-bold text-gray-900 mb-2">Build Your Box</h1>
               <p className="text-gray-500">Pick any meals you love. We'll portion everything fresh.</p>
             </div>
-            <button
-              onClick={() => setShowRecommendation(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg hover:scale-105"
-              style={{ background: 'linear-gradient(135deg, #1b5e20, #43a047)' }}
-            >
-              <Sparkles className="w-4 h-4" />
-              🤖 ابني بوكسك الذكي
-            </button>
+            <p className="text-sm text-gray-400 italic">
+              Need help choosing? Ask our assistant 🥕 in the chat!
+            </p>
           </div>
         </div>
       </div>

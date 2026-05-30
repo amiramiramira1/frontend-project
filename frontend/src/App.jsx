@@ -1,6 +1,4 @@
-import { useState } from 'react';
 import Chatbot from './components/Chatbot';
-import Recommendation from './components/Recommendation';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
@@ -30,30 +28,12 @@ import SubscriptionsPage from './pages/dashboard/SubscriptionsPage';
 import AdminLayout from './pages/admin/AdminLayout';
 
 function AppLayout({ children }) {
-  const { user } = useAuth();
-  const [showRecommendation, setShowRecommendation] = useState(() => {
-    // بيظهر بس لو المستخدم مسجل دخول وما عملش الاختيارات قبل كده
-    if (!user) return false;
-    const done = localStorage.getItem(`recommendation_done_${user._id}`);
-    return !done;
-  });
-
-  function handleCloseRecommendation() {
-    if (user) {
-      localStorage.setItem(`recommendation_done_${user._id}`, 'true');
-    }
-    setShowRecommendation(false);
-  }
-
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
       <Chatbot />
-      {showRecommendation && (
-        <Recommendation onClose={handleCloseRecommendation} />
-      )}
     </div>
   );
 }

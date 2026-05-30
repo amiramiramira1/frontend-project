@@ -3,16 +3,24 @@ const router = express.Router();
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
-async function callAIService(endpoint, body) {
-  console.log('🤖 Calling AI service:', endpoint, JSON.stringify(body));
+/**
+ * Proxy helper — forwards requests to the Python AI service.
+ * Now also forwards the user's JWT token so the AI service can
+ * call authenticated backend endpoints (cart, subscriptions, etc.)
+ */
+async function callAIService(endpoint, body, method = 'POST') {
+  console.log(`🤖 AI service ${method} ${endpoint}`);
   try {
-    const response = await fetch(`${AI_SERVICE_URL}${endpoint}`, {
-      method: 'POST',
+    const options = {
+      method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    };
+    if (method !== 'GET' && method !== 'DELETE') {
+      options.body = JSON.stringify(body);
+    }
+    const response = await fetch(`${AI_SERVICE_URL}${endpoint}`, options);
     const data = await response.json();
-    console.log('✅ AI response:', JSON.stringify(data).substring(0, 100));
+    console.log('✅ AI response:', JSON.stringify(data).substring(0, 150));
     return data;
   } catch (error) {
     console.error('❌ AI Service Error:', error.message);
@@ -20,51 +28,38 @@ async function callAIService(endpoint, body) {
   }
 }
 
+// @route   POST /api/chatbot/chat
+// @access  Public (but personalized features require auth)
 router.post('/chat', async (req, res) => {
   try {
     const { message, sessionId, language } = req.body;
-    if (!message) return res.status(400).json({ error: 'مفيش رسالة' });
+    if (!message) return res.status(400).json({ error: 'Message is required' });
+
+    // Extract user token from the Authorization header and forward it to the AI service
+    let userToken = null;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      userToken = req.headers.authorization.split(' ')[1];
+    }
 
     const data = await callAIService('/chat', {
       message,
       session_id: sessionId || 'default',
       language: language || 'ar',
+      user_token: userToken,
     });
+
     return res.json(data);
   } catch (error) {
     console.error('Chatbot error:', error.message);
     return res.status(500).json({
-      answer: 'معلش حصلت مشكلة، حاولي تاني',
+      answer: 'Sorry, something went wrong. Please try again.',
       error: error.message,
     });
   }
 });
 
-// ── FIX: بنبعت الداتا الصح للـ ai-service ─────────────────────────────────
-router.post('/recommend', async (req, res) => {
-  try {
-    const { diet, goal, people, budget, allergies, language, mode } = req.body;
-
-    const data = await callAIService('/recommend', {
-      diet:      diet      || '',
-      goal:      goal      || '',
-      people:    people    || '',
-      budget:    budget    || '',
-      allergies: allergies || '',
-      language:  language  || 'ar',
-      mode:      mode      || 'boxes',
-    });
-
-    return res.json(data);
-  } catch (error) {
-    console.error('Recommendation error:', error.message);
-    return res.status(500).json({
-      recommendation: 'معلش مقدرناش نوصلك باقتراح، حاولي تاني 😅',
-      error: error.message,
-    });
-  }
-});
-
+// @route   DELETE /api/chatbot/session/:sessionId
+// @access  Public
 router.delete('/session/:sessionId', async (req, res) => {
   try {
     const response = await fetch(
@@ -74,7 +69,7 @@ router.delete('/session/:sessionId', async (req, res) => {
     const data = await response.json();
     return res.json(data);
   } catch (error) {
-    return res.status(500).json({ error: 'في مشكلة' });
+    return res.status(500).json({ error: 'Failed to clear session' });
   }
 });
 

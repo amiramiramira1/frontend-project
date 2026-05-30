@@ -2,8 +2,18 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
-import { User, MapPin, Plus, Trash2, Save } from 'lucide-react';
+import { User, MapPin, Plus, Trash2, Save, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const ALLERGEN_OPTIONS = [
+  { value: 'gluten',    label: '🌾 Gluten',    emoji: '🌾' },
+  { value: 'dairy',     label: '🥛 Dairy',     emoji: '🥛' },
+  { value: 'nuts',      label: '🥜 Nuts',      emoji: '🥜' },
+  { value: 'eggs',      label: '🥚 Eggs',      emoji: '🥚' },
+  { value: 'soy',       label: '🫘 Soy',       emoji: '🫘' },
+  { value: 'shellfish', label: '🦐 Shellfish', emoji: '🦐' },
+  { value: 'fish',      label: '🐟 Fish',      emoji: '🐟' },
+];
 
 export default function ProfilePage() {
   const { user, refreshUser, deleteAccount } = useAuth();
@@ -13,6 +23,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
 
   const [addresses, setAddresses] = useState(user?.addresses || []);
+  const [allergens, setAllergens] = useState(user?.allergens || []);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAddr, setNewAddr] = useState({
     label: 'Home',
@@ -27,10 +38,16 @@ export default function ProfilePage() {
   const [showDelete, setShowDelete] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
+  const toggleAllergen = (value) => {
+    setAllergens(prev =>
+      prev.includes(value) ? prev.filter(a => a !== value) : [...prev, value]
+    );
+  };
+
   const saveProfile = async () => {
     setSaving(true);
     try {
-      await api.put('/auth/profile', { name, addresses });
+      await api.put('/auth/profile', { name, addresses, allergens });
       await refreshUser();
       toast.success('Profile updated!');
     } catch {
@@ -193,6 +210,38 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Allergens */}
+      <div className="card p-6">
+        <h3 className="font-display font-bold text-lg mb-2 flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5 text-red-400" />
+          Food Allergens
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Select any allergens so we can filter unsafe meals and boxes for you.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {ALLERGEN_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggleAllergen(opt.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                allergens.includes(opt.value)
+                  ? 'border-red-400 bg-red-50 text-red-700'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {allergens.length > 0 && (
+          <p className="text-xs text-gray-400 mt-3">
+            {allergens.length} allergen{allergens.length !== 1 ? 's' : ''} selected — meals with these ingredients will be flagged.
+          </p>
         )}
       </div>
 

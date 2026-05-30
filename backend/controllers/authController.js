@@ -34,6 +34,8 @@ const register = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        dietPreferences: user.dietPreferences,
+        allergens: user.allergens,
       },
     });
   } catch (error) {
@@ -67,6 +69,9 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        addresses: user.addresses,
+        dietPreferences: user.dietPreferences,
+        allergens: user.allergens,
       },
     });
   } catch (error) {
@@ -87,12 +92,12 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { name, addresses, dietPreferences } = req.body;
+    const { name, addresses, dietPreferences, allergens } = req.body;
 
     // Only allow updating specific safe fields — never role or password here
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
-      { name, addresses, dietPreferences },
+      { name, addresses, dietPreferences, allergens },
       { new: true, runValidators: true }
     );
 
@@ -104,6 +109,7 @@ const updateProfile = async (req, res) => {
         email: updatedUser.email,
         addresses: updatedUser.addresses,
         dietPreferences: updatedUser.dietPreferences,
+        allergens: updatedUser.allergens,
       },
     });
   } catch (error) {

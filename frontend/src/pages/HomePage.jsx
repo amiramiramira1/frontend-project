@@ -22,7 +22,9 @@ const steps = [
 export default function HomePage() {
   const { user } = useAuth();
   const [featuredBoxes, setFeaturedBoxes] = useState([]);
+  const [recommendedBoxes, setRecommendedBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRecommended, setLoadingRecommended] = useState(false);
 
   useEffect(() => {
     // Fetch real boxes from API, take the first 3 as featured
@@ -30,6 +32,17 @@ export default function HomePage() {
       .then(({ data }) => setFeaturedBoxes(data.boxes || []))
       .finally(() => setLoading(false));
   }, []);
+
+  // Fetch personalized recommendations when user is logged in
+  useEffect(() => {
+    if (user) {
+      setLoadingRecommended(true);
+      api.get('/boxes/recommended', { params: { limit: 6 } })
+        .then(({ data }) => setRecommendedBoxes(data.boxes || []))
+        .catch(() => {})
+        .finally(() => setLoadingRecommended(false));
+    }
+  }, [user]);
 
   return (
     <div className="min-h-screen">
@@ -78,6 +91,38 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* RECOMMENDED FOR YOU — only for logged-in users */}
+      {user && recommendedBoxes.length > 0 && (
+        <section className="py-10 bg-white border-b border-gray-100">
+          <div className="page-container">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl flex items-center justify-center">
+                <span className="text-xl">🥕</span>
+              </div>
+              <div>
+                <h2 className="font-display font-bold text-xl text-gray-900">Recommended for You</h2>
+                <p className="text-sm text-gray-500">Based on your preferences and order history</p>
+              </div>
+            </div>
+            {loadingRecommended ? (
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {[1,2,3].map(i => (
+                  <div key={i} className="min-w-[280px] h-64 card animate-pulse bg-gray-100 rounded-2xl flex-shrink-0" />
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden -mx-4 px-4">
+                {recommendedBoxes.map(box => (
+                  <div key={box._id} className="min-w-[280px] flex-shrink-0">
+                    <BoxCard box={box} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* FEATURES */}
       <section className="py-10 bg-white">

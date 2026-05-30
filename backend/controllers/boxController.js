@@ -1,5 +1,6 @@
 const Box = require('../models/Box');
 const Meal = require('../models/Meal');
+const Order = require('../models/Order');
 const paginate = require('../utils/paginate');
 
 // Helper: calculate box base price from its meals
@@ -192,5 +193,117 @@ const calculateCustomBox = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PERSONALIZED BOX SCORING
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Weights for each scoring factor (must sum to 1.0)
+const SCORE_WEIGHTS = {
+  dietMatch:       0.35,
+  allergenSafety:  0.30,
+  popularity:      0.15,
+  reorderAffinity: 0.20,
+};
+
+/**
+ * Score a single box for a given user.
+ * Returns a number between 0 and 1.
+ */
+const scoreBox = (box, { userDietPrefs, userAllergens, userOrderedBoxIds, popularityMap, maxOrders }) => {
+  let score = 0;
+
+  // 1. Diet match — does the box's dietType match any of the user's preferences?
+  if (userDietPrefs.length === 0) {
+    score += SCORE_WEIGHTS.dietMatch * 0.5; // No preferences = neutral
+  } else if (userDietPrefs.includes(box.dietType) || box.dietType === 'mixed') {
+    score += SCORE_WEIGHTS.dietMatch * 1.0;
+  }
+
+  // 2. Allergen safety — what fraction of the box's meals are free of user's allergens?
+  if (userAllergens.length === 0) {
+    score += SCORE_WEIGHTS.allergenSafety * 1.0; // No allergens = fully safe
+  } else {
+    const meals = box.meals || [];
+    if (meals.length === 0) {
+      score += SCORE_WEIGHTS.allergenSafety * 0.5;
+    } else {
+      const safeMeals = meals.filter(meal => {
+        const mealAllergens = meal.allergens || [];
+        return !mealAllergens.some(a => userAllergens.includes(a));
+      });
+      score += SCORE_WEIGHTS.allergenSafety * (safeMeals.length / meals.length);
+    }
+  }
+
+  // 3. Popularity — normalized order count
+  const orderCount = popularityMap.get(box._id.toString()) || 0;
+  score += SCORE_WEIGHTS.popularity * (maxOrders > 0 ? orderCount / maxOrders : 0);
+
+  // 4. Reorder affinity — has the user ordered this box before?
+  if (userOrderedBoxIds.has(box._id.toString())) {
+    score += SCORE_WEIGHTS.reorderAffinity * 1.0;
+  }
+
+  return parseFloat(score.toFixed(4));
+};
+
+// @route   GET /api/boxes/recommended
+// @access  Public (personalized if authenticated, popularity-based if guest)
+const getRecommendedBoxes = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 6;
+
+    // Fetch all active boxes with their meals populated (need allergens data)
+    const boxes = await Box.find({ isActive: true })
+      .populate({ path: 'meals', select: 'name allergens dietType pricePerServing caloriesPerServing' });
+
+    if (boxes.length === 0) {
+      return res.status(200).json({ boxes: [], message: 'No active boxes available' });
+    }
+
+    // Count how many times each box has been ordered (for popularity scoring)
+    const orderAgg = await Order.aggregate([
+      { $unwind: '$items' },
+      { $group: { _id: '$items.box', count: { $sum: 1 } } },
+    ]);
+    const popularityMap = new Map(orderAgg.map(o => [o._id.toString(), o.count]));
+    const maxOrders = Math.max(...orderAgg.map(o => o.count), 1);
+
+    // Build user context
+    const user = req.user;
+    const userDietPrefs = user?.dietPreferences || [];
+    const userAllergens = user?.allergens || [];
+
+    // Get boxes the user has previously ordered
+    let userOrderedBoxIds = new Set();
+    if (user) {
+      const userOrders = await Order.find({ user: user._id }).select('items.box');
+      userOrders.forEach(order => {
+        order.items.forEach(item => userOrderedBoxIds.add(item.box.toString()));
+      });
+    }
+
+    const context = { userDietPrefs, userAllergens, userOrderedBoxIds, popularityMap, maxOrders };
+
+    // Score and sort
+    const servingSize = parseInt(req.query.servingSize) || 2;
+    const multiplier = SERVING_MULTIPLIERS[servingSize] || 1;
+
+    const scoredBoxes = boxes
+      .map(box => ({
+        ...box.toObject(),
+        relevanceScore: scoreBox(box, context),
+        priceForServing: parseFloat((box.basePrice * multiplier).toFixed(2)),
+        requestedServingSize: servingSize,
+      }))
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, limit);
+
+    res.status(200).json({ boxes: scoredBoxes });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Add to module.exports:
-module.exports = { getBoxes, getBox, createBox, createCustomBox, updateBox, deleteBox, calculateCustomBox };
+module.exports = { getBoxes, getBox, createBox, createCustomBox, updateBox, deleteBox, calculateCustomBox, getRecommendedBoxes };

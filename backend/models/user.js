@@ -40,6 +40,12 @@ const userSchema = new mongoose.Schema(
         enum: ["vegan", "vegetarian", "keto", "paleo", "standard"],
       },
     ],
+    allergens: [
+      {
+        type: String,
+        enum: ["gluten", "dairy", "nuts", "eggs", "soy", "shellfish", "fish"],
+      },
+    ],
   },
   { timestamps: true },
 );
