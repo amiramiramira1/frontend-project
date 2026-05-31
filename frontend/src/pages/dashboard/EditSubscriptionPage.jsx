@@ -22,7 +22,7 @@ export default function EditSubscriptionPage() {
     const [form, setForm] = useState({
         frequency: sub?.frequency || 'weekly',
         deliveryDay: sub?.deliveryDay || 'saturday',
-        servingsPerMeal: sub?.servingsPerMeal || 2,
+        servingSize: sub?.servingSize || 2,
     });
 
     if (!sub) { navigate('/dashboard/subscriptions'); return null; }
@@ -34,13 +34,8 @@ export default function EditSubscriptionPage() {
         await api.patch(`/subscriptions/${sub._id}`, form);
         toast.success('Subscription updated!');
         navigate('/dashboard/subscriptions');
-    } catch {
-        // Backend not ready — update localStorage directly
-        const saved = JSON.parse(localStorage.getItem('boxify_subs') || '[]');
-        const updated = saved.map(s => s._id === sub._id ? { ...s, ...form } : s);
-        localStorage.setItem('boxify_subs', JSON.stringify(updated));
-        toast.success('Subscription updated!');
-        navigate('/dashboard/subscriptions');
+    } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to update subscription.');
     } finally {
         setLoading(false);
     }
@@ -101,27 +96,6 @@ export default function EditSubscriptionPage() {
                             </div>
                         </div>
 
-                        {/* Delivery Day */}
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Preferred Delivery Day</label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {days.map(day => (
-                                    <button
-                                    key={day}
-                                    type="button"
-                                    onClick={() => setForm(p => ({ ...p, deliveryDay: day }))}
-                                    className={`py-2.5 rounded-xl text-sm font-medium transition-all border capitalize ${
-                                        form.deliveryDay === day
-                                        ? 'bg-brand-500 text-white border-brand-500'
-                                        : 'border-gray-200 text-gray-700 hover:border-brand-300'
-                                    }`}
-                                    >
-                                    {day.slice(0, 3)}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
                         {/* Serving Size */}
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Serving Size</label>
@@ -130,9 +104,9 @@ export default function EditSubscriptionPage() {
                                     <button
                                     key={size}
                                     type="button"
-                                    onClick={() => setForm(p => ({ ...p, servingsPerMeal: size }))}
+                                    onClick={() => setForm(p => ({ ...p, servingSize: size }))}
                                     className={`py-2.5 rounded-xl text-sm font-medium transition-all border ${
-                                        form.servingsPerMeal === size
+                                        form.servingSize === size
                                         ? 'bg-brand-500 text-white border-brand-500'
                                         : 'border-gray-200 text-gray-700 hover:border-brand-300'
                                     }`}

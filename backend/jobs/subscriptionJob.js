@@ -5,16 +5,62 @@ const Box = require('../models/Box');
 
 const SERVING_MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
 
+// Maps deliveryDay string → JS Date.getDay() index (0 = Sunday)
+const DAY_INDEX = {
+  sunday:    0,
+  monday:    1,
+  tuesday:   2,
+  wednesday: 3,
+  thursday:  4,
+  friday:    5,
+  saturday:  6,
+};
+
+/**
+ * Returns the next delivery Date that:
+ *   - lands on the user's preferred weekday (deliveryDay)
+ *   - is at least 7 days away (weekly) or in the next calendar month (monthly)
+ *
+ * @param {'weekly'|'monthly'} frequency
+ * @param {string} deliveryDay  e.g. 'saturday'
+ * @returns {Date}
+ */
+const getNextDeliveryDate = (frequency, deliveryDay = 'saturday') => {
+  const targetDayIndex = DAY_INDEX[deliveryDay] ?? DAY_INDEX.saturday;
+  const base = new Date();
+
+  if (frequency === 'weekly') {
+    // Start from at least 7 days out, then walk forward to the target weekday
+    const earliest = new Date(base);
+    earliest.setDate(earliest.getDate() + 7);
+
+    const daysAhead = (targetDayIndex - earliest.getDay() + 7) % 7;
+    earliest.setDate(earliest.getDate() + daysAhead);
+    earliest.setHours(8, 0, 0, 0); // 08:00 delivery window
+    return earliest;
+  }
+
+  // monthly: first occurrence of the target weekday in the next calendar month
+  const next = new Date(base);
+  next.setMonth(next.getMonth() + 1, 1); // 1st of next month
+
+  const daysAhead = (targetDayIndex - next.getDay() + 7) % 7;
+  next.setDate(next.getDate() + daysAhead);
+  next.setHours(8, 0, 0, 0);
+  return next;
+};
+
 const processSubscriptions = async () => {
   console.log('🔄 Running subscription job at', new Date().toISOString());
 
   try {
-    const now = new Date();
+    // Match all active subscriptions due today or overdue
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-    // Find all active subscriptions where the next delivery date has arrived
     const dueSubscriptions = await Subscription.find({
       status: 'active',
-      nextDeliveryDate: { $lte: now },
+      nextDeliveryDate: { $lte: endOfDay },
     }).populate('box');
 
     console.log(`📦 Found ${dueSubscriptions.length} subscription(s) to process`);
@@ -26,7 +72,7 @@ const processSubscriptions = async () => {
       const multiplier = SERVING_MULTIPLIERS[subscription.servingSize] || 1;
       const priceAtPurchase = parseFloat((box.basePrice * multiplier).toFixed(2));
 
-      // Create a new order for this subscription
+      // Create the delivery order
       await Order.create({
         user: subscription.user,
         items: [
@@ -43,29 +89,27 @@ const processSubscriptions = async () => {
         status: 'confirmed',
       });
 
-      // Calculate the next delivery date and update the subscription
-      const nextDate = new Date(now);
-      if (subscription.frequency === 'weekly') {
-        nextDate.setDate(nextDate.getDate() + 7);
-      } else {
-        nextDate.setMonth(nextDate.getMonth() + 1);
-      }
-      subscription.nextDeliveryDate = nextDate;
+      // Advance to the next delivery, honouring the user's preferred day
+      subscription.nextDeliveryDate = getNextDeliveryDate(
+        subscription.frequency,
+        subscription.deliveryDay,  // ← the key change: use the user's chosen weekday
+      );
       await subscription.save();
 
-      console.log(`✅ Order created for subscription ${subscription._id}`);
+      console.log(
+        `✅ Order created for subscription ${subscription._id}` +
+        ` | next: ${subscription.nextDeliveryDate.toDateString()}`,
+      );
     }
   } catch (error) {
     console.error('❌ Subscription job error:', error.message);
   }
 };
 
-// Schedule: runs every day at midnight (00:00)
-// Cron syntax: second(optional) minute hour day-of-month month day-of-week
-// '0 0 * * *' means: at minute 0, hour 0, every day
+// Runs every day at 07:00 — processes today's deliveries before the 08:00 window
 const startSubscriptionJob = () => {
-  cron.schedule('0 0 * * *', processSubscriptions);
-  console.log('⏰ Subscription cron job scheduled (runs daily at midnight)');
+  cron.schedule('0 7 * * *', processSubscriptions);
+  console.log('⏰ Subscription cron job scheduled (runs daily at 07:00)');
 };
 
-module.exports = { startSubscriptionJob };
+module.exports = { startSubscriptionJob, getNextDeliveryDate };

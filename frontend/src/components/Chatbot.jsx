@@ -3,12 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const API_BASE = '/api/chatbot';
 
 export default function Chatbot() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [language, setLanguage] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -21,6 +23,14 @@ export default function Chatbot() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-initialize chatbot language to website language when chat opens
+  const webLang = i18n.language?.startsWith('ar') ? 'ar' : 'en';
+  useEffect(() => {
+    if (isOpen && !language) {
+      selectLanguage(webLang);
+    }
+  }, [isOpen, language, webLang]);
 
   useEffect(() => {
     if (isOpen && language && inputRef.current) {
@@ -53,6 +63,13 @@ export default function Chatbot() {
     const userMessage = overrideMessage || input.trim();
     if (!userMessage || loading) return;
     if (!overrideMessage) setInput('');
+
+    // Auto-detect language of the user message to keep UI layout and language consistent
+    const promptLang = /[\u0600-\u06FF]/.test(userMessage) ? 'ar' : 'en';
+    if (promptLang !== language) {
+      setLanguage(promptLang);
+    }
+
     setMessages(prev => [...prev, { from: 'user', text: userMessage }]);
     setLoading(true);
 

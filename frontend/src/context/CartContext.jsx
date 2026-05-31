@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
+import i18next from 'i18next';
 
 const CartContext = createContext(null);
 
@@ -48,7 +49,7 @@ export const CartProvider = ({ children }) => {
       setCart(data.cart);
       return data.cart;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to add to cart';
+      const msg = err.response?.data?.message || i18next.t('msg.addToCartFailed');
       toast.error(msg);
       throw err;
     } finally {
@@ -65,7 +66,7 @@ export const CartProvider = ({ children }) => {
       const { data } = await api.put(`/cart/items/${itemId}`, updates);
       setCart(data.cart);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update cart');
+      toast.error(err.response?.data?.message || i18next.t('msg.updateCartFailed'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export const CartProvider = ({ children }) => {
       const { data } = await api.delete(`/cart/items/${itemId}`);
       setCart(data.cart);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to remove item');
+      toast.error(err.response?.data?.message || i18next.t('msg.removeItemFailed'));
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ export const CartProvider = ({ children }) => {
       const { data } = await api.delete('/cart');
       setCart(data.cart);
     } catch (err) {
-      toast.error('Failed to clear cart');
+      toast.error(i18next.t('msg.clearCartFailed'));
     } finally {
       setLoading(false);
     }

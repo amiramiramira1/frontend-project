@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Package, Instagram, Twitter, Facebook, Mail, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 function AccordionSection({ title, children }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,6 +26,8 @@ function AccordionSection({ title, children }) {
 }
 
 export default function Footer() {
+  const { t } = useTranslation();
+
   return (
     <footer className="bg-gray-900 text-gray-300 mt-auto">
       <div className="page-container py-8">
@@ -38,7 +41,7 @@ export default function Footer() {
               <span className="font-display text-xl font-bold text-white">Boxify</span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed mb-4">
-              Fresh, pre-portioned meal kits delivered to your door. Cook like a chef, waste less, live better.
+              {t('footer.tagline')}
             </p>
             <div className="flex gap-3 mb-0">
               {[Instagram, Twitter, Facebook].map((Icon, idx) => (
@@ -50,32 +53,32 @@ export default function Footer() {
           </div>
 
           {/* Accordion Sections */}
-          <AccordionSection title="Shop">
-            <li><Link to="/boxes" className="hover:text-brand-400 transition-colors">All Meal Boxes</Link></li>
-            <li><Link to="/build-box" className="hover:text-brand-400 transition-colors">Build Custom Box</Link></li>
-            <li><Link to="/boxes?category=Mediterranean" className="hover:text-brand-400 transition-colors">Mediterranean</Link></li>
-            <li><Link to="/boxes?category=Healthy" className="hover:text-brand-400 transition-colors">Healthy Options</Link></li>
+          <AccordionSection title={t('footer.shopTitle')}>
+            <li><Link to="/boxes" className="hover:text-brand-400 transition-colors">{t('footer.allMealBoxes')}</Link></li>
+            <li><Link to="/build-box" className="hover:text-brand-400 transition-colors">{t('footer.buildCustomBox')}</Link></li>
+            <li><Link to="/boxes?category=Mediterranean" className="hover:text-brand-400 transition-colors">{t('footer.mediterranean')}</Link></li>
+            <li><Link to="/boxes?category=Healthy" className="hover:text-brand-400 transition-colors">{t('footer.healthyOptions')}</Link></li>
           </AccordionSection>
 
-          <AccordionSection title="Account">
-            <li><Link to="/dashboard" className="hover:text-brand-400 transition-colors">My Dashboard</Link></li>
-            <li><Link to="/dashboard/orders" className="hover:text-brand-400 transition-colors">My Orders</Link></li>
-            <li><Link to="/dashboard/subscriptions" className="hover:text-brand-400 transition-colors">Subscriptions</Link></li>
-            <li><Link to="/cart" className="hover:text-brand-400 transition-colors">Cart</Link></li>
+          <AccordionSection title={t('footer.accountTitle')}>
+            <li><Link to="/dashboard" className="hover:text-brand-400 transition-colors">{t('footer.myDashboard')}</Link></li>
+            <li><Link to="/dashboard/orders" className="hover:text-brand-400 transition-colors">{t('footer.myOrders')}</Link></li>
+            <li><Link to="/dashboard/subscriptions" className="hover:text-brand-400 transition-colors">{t('footer.subscriptions')}</Link></li>
+            <li><Link to="/cart" className="hover:text-brand-400 transition-colors">{t('footer.cart')}</Link></li>
           </AccordionSection>
 
-          <AccordionSection title="Contact">
+          <AccordionSection title={t('footer.contactTitle')}>
             <li className="flex items-center gap-2"><Mail className="w-4 h-4 text-brand-400" /> hello@boxify.eg</li>
-            <li className="text-gray-400">Cairo, Egypt</li>
-            <li className="text-gray-400">Delivery: Sat–Thu</li>
+            <li className="text-gray-400">{t('footer.city')}</li>
+            <li className="text-gray-400">{t('footer.deliveryDays')}</li>
           </AccordionSection>
         </div>
 
         <div className="border-t border-gray-800 mt-4 pt-2 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-gray-500">© 2026 Boxify. All rights reserved.</p>
+          <p className="text-sm text-gray-500">{t('footer.copyright')}</p>
           <div className="flex gap-6 text-sm text-gray-500">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-white transition-colors">{t('footer.privacy')}</a>
+            <a href="#" className="hover:text-white transition-colors">{t('footer.terms')}</a>
           </div>
         </div>
       </div>

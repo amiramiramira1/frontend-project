@@ -14,10 +14,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const isAuthRequest = err.config?.url?.includes('/auth/login') || err.config?.url?.includes('/auth/register');
+    
+    if (err.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('boxify_token');
       localStorage.removeItem('boxify_user');
-      window.location.href = '/login';
+      
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   }

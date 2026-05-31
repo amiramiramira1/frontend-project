@@ -1,17 +1,120 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, NavLink, Routes, Route, Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { LayoutDashboard, Package, Repeat, Users, BarChart3, RefreshCw, CheckCircle, Clock, Truck, XCircle, ChefHat } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import {
+  LayoutDashboard, Package, Repeat, Users, BarChart3, RefreshCw,
+  CheckCircle, Clock, Truck, XCircle, ChefHat, Boxes,
+  Plus, Pencil, Trash2, X, Upload, Search, Image as ImageIcon,
+} from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// Valid statuses from the Order model enum
-const statusOptions = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'];
-const MULTIPLIERS   = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
+// ── Constants ──────────────────────────────────────────────────────
+const statusOptions   = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'];
+const MULTIPLIERS     = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
+const DIET_TYPES_MEAL = ['vegan', 'vegetarian', 'keto', 'paleo', 'standard'];
+const DIET_TYPES_BOX  = ['vegan', 'vegetarian', 'keto', 'paleo', 'standard', 'mixed'];
+const ALLERGEN_LIST   = ['gluten', 'dairy', 'nuts', 'eggs', 'soy', 'shellfish', 'fish'];
 
-// ── AdminStats ─────────────────────────────────────────────────────
-// GET /api/admin/stats → { stats: { totalOrders, totalRevenue, totalUsers, ordersByStatus, ... } }
+// ── Reusable: SlideOver drawer ─────────────────────────────────────
+function SlideOver({ open, onClose, title, children, onSave, saving }) {
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div
+        className={`fixed top-0 right-0 h-full w-full max-w-xl bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-display text-lg font-bold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {children}
+        </div>
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-3 rounded-xl border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-semibold text-sm transition-colors">
+            Cancel
+          </button>
+          <button onClick={onSave} disabled={saving} className="flex-1 btn-primary">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Reusable: ImageUploader ────────────────────────────────────────
+function ImageUploader({ value, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef();
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    setUploading(true);
+    try {
+      const { data } = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      onChange(data.url);
+    } catch { toast.error('Image upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">Image</label>
+      <div className="flex items-center gap-3">
+        {value ? (
+          <img src={value} alt="preview" className="w-16 h-16 rounded-xl object-cover border border-gray-200 flex-shrink-0" />
+        ) : (
+          <div className="w-16 h-16 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+            <ImageIcon className="w-6 h-6 text-gray-400" />
+          </div>
+        )}
+        <div className="flex-1">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="btn-outline !py-2 !px-4 flex items-center gap-2 text-sm w-full justify-center"
+          >
+            <Upload className="w-4 h-4" />
+            {uploading ? 'Uploading...' : value ? 'Change Image' : 'Upload Image'}
+          </button>
+          {value && (
+            <p className="text-xs text-gray-400 mt-1 truncate">{value}</p>
+          )}
+        </div>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
+
+// ── Reusable: FormField ────────────────────────────────────────────
+function FormField({ label, children }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ── AdminStats ──────────────────────────────────────────────────────
 function AdminStats() {
   const [stats, setStats] = useState(null);
   const [subStats, setSubStats] = useState(null);
@@ -32,14 +135,14 @@ function AdminStats() {
     <>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Orders',          value: stats?.totalOrders,                            color: 'from-blue-500 to-blue-600',     icon: Package },
-          { label: 'Revenue (Delivered)',   value: `${stats?.totalRevenue?.toLocaleString()} EGP`, color: 'from-brand-400 to-brand-600',   icon: BarChart3 },
-          { label: 'Active Subscriptions',  value: subStats?.active,                              color: 'from-green-500 to-green-600',   icon: Repeat },
-          { label: 'Total Users',           value: stats?.totalUsers,                             color: 'from-purple-500 to-purple-600', icon: Users },
-          { label: 'Active Boxes',          value: stats?.totalBoxes,                             color: 'from-orange-400 to-orange-600', icon: ChefHat },
-          { label: 'Total Meals',           value: stats?.totalMeals,                             color: 'from-teal-500 to-teal-600',    icon: Package },
-          { label: 'Paused Subscriptions',  value: subStats?.paused,                              color: 'from-yellow-400 to-yellow-600', icon: Repeat },
-          { label: 'Cancelled Subs',        value: subStats?.cancelled,                           color: 'from-red-400 to-red-600',       icon: XCircle },
+          { label: 'Total Orders',         value: stats?.totalOrders,                            color: 'from-blue-500 to-blue-600',     icon: Package },
+          { label: 'Revenue (Delivered)',  value: `${stats?.totalRevenue?.toLocaleString()} EGP`, color: 'from-brand-400 to-brand-600',   icon: BarChart3 },
+          { label: 'Active Subscriptions', value: subStats?.active,                              color: 'from-green-500 to-green-600',   icon: Repeat },
+          { label: 'Total Users',          value: stats?.totalUsers,                             color: 'from-purple-500 to-purple-600', icon: Users },
+          { label: 'Active Boxes',         value: stats?.totalBoxes,                             color: 'from-orange-400 to-orange-600', icon: Boxes },
+          { label: 'Total Meals',          value: stats?.totalMeals,                             color: 'from-teal-500 to-teal-600',    icon: ChefHat },
+          { label: 'Paused Subscriptions', value: subStats?.paused,                              color: 'from-yellow-400 to-yellow-600', icon: Repeat },
+          { label: 'Cancelled Subs',       value: subStats?.cancelled,                           color: 'from-red-400 to-red-600',       icon: XCircle },
         ].map(({ label, value, color, icon: Icon }) => (
           <div key={label} className={`bg-gradient-to-br ${color} rounded-2xl p-5 text-white`}>
             <Icon className="w-6 h-6 opacity-80 mb-3" />
@@ -48,7 +151,6 @@ function AdminStats() {
           </div>
         ))}
       </div>
-      {/* Orders by status bar chart */}
       {stats?.ordersByStatus && (
         <div className="card p-5 mt-6">
           <h3 className="font-display font-bold text-gray-900 mb-4">Orders by Status</h3>
@@ -67,15 +169,12 @@ function AdminStats() {
   );
 }
 
-// ── AdminOrders ───────────────────────────────────────────────────
-// GET /api/orders → { orders: [...], pagination }   (admin sees all)
-// PUT /api/orders/:id/status → { status }
+// ── AdminOrders ────────────────────────────────────────────────────
 function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Admin can see all orders via GET /api/orders
     api.get('/orders', { params: { limit: 100 } })
       .then(({ data }) => setOrders(data.orders || []))
       .catch(() => toast.error('Failed to load orders'))
@@ -84,7 +183,6 @@ function AdminOrders() {
 
   const updateStatus = async (id, status) => {
     try {
-      // PUT /api/orders/:id/status (admin route)
       await api.put(`/orders/${id}/status`, { status });
       setOrders(prev => prev.map(o => o._id === id ? { ...o, status } : o));
       toast.success('Status updated');
@@ -102,14 +200,9 @@ function AdminOrders() {
           <div key={order._id} className="card p-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                {/* order.user is populated with { name, email } */}
                 <div className="font-bold text-gray-900">#{order._id.slice(-8).toUpperCase()}</div>
-                <div className="text-sm text-gray-500">
-                  {order.user?.name} · {order.user?.email}
-                </div>
-                <div className="text-sm text-brand-600 font-medium mt-0.5">
-                  {order.totalPrice?.toLocaleString()} EGP
-                </div>
+                <div className="text-sm text-gray-500">{order.user?.name} · {order.user?.email}</div>
+                <div className="text-sm text-brand-600 font-medium mt-0.5">{order.totalPrice?.toLocaleString()} EGP</div>
                 <div className="text-xs text-gray-400 mt-0.5">
                   {new Date(order.createdAt).toLocaleDateString('en-EG', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
@@ -129,9 +222,7 @@ function AdminOrders() {
   );
 }
 
-// ── AdminSubscriptions ────────────────────────────────────────────
-// GET /api/admin/subscriptions/upcoming → { upcomingDeliveries: [...] }
-// POST /api/admin/subscriptions/generate → { subscriptionId }
+// ── AdminSubscriptions ─────────────────────────────────────────────
 function AdminSubscriptions() {
   const [upcoming, setUpcoming] = useState([]);
   const [allSubs, setAllSubs]   = useState([]);
@@ -152,7 +243,6 @@ function AdminSubscriptions() {
       .finally(() => setLoading(false));
   }, []);
 
-  // POST /api/admin/subscriptions/generate with { subscriptionId } in body
   const manualGenerate = async (subscriptionId) => {
     setGenerating(subscriptionId);
     try {
@@ -182,7 +272,6 @@ function AdminSubscriptions() {
       {displayList.length === 0 && <p className="text-gray-400 text-center py-10">No subscriptions to show</p>}
       <div className="space-y-3">
         {displayList.map(sub => {
-          // sub.user and sub.box are populated
           const pricePerDelivery = sub.box?.basePrice
             ? (sub.box.basePrice * (MULTIPLIERS[sub.servingSize] || 1)).toFixed(0)
             : '—';
@@ -225,8 +314,7 @@ function AdminSubscriptions() {
   );
 }
 
-// ── AdminUsers ────────────────────────────────────────────────────
-// GET /api/admin/users → { users: [...] }
+// ── AdminUsers ─────────────────────────────────────────────────────
 function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -266,15 +354,742 @@ function AdminUsers() {
   );
 }
 
-// ── Admin nav ─────────────────────────────────────────────────────
+// ── AdminInventory (stock-only quick view) ─────────────────────────
+function AdminInventory() {
+  const [meals, setMeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/meals', { params: { limit: 100 } })
+      .then(({ data }) => setMeals(data.meals || []))
+      .catch(() => toast.error('Failed to load meals'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const updateMeal = async (id, changes) => {
+    setMeals(prev => prev.map(m => m._id === id ? { ...m, ...changes } : m));
+    try {
+      await api.put(`/meals/${id}`, changes);
+      toast.success('Meal updated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update meal');
+      api.get('/meals', { params: { limit: 100 } }).then(({ data }) => setMeals(data.meals || []));
+    }
+  };
+
+  if (loading) return <div className="animate-pulse h-60 bg-gray-100 rounded-2xl" />;
+
+  return (
+    <div>
+      <h2 className="font-display text-xl font-bold mb-4">Inventory ({meals.length} meals)</h2>
+      {meals.length === 0 && <p className="text-gray-400 text-center py-10">No meals found</p>}
+      <div className="space-y-3">
+        {meals.map(meal => (
+          <div key={meal._id} className="card p-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                  {meal.image
+                    ? <img src={meal.image} alt={meal.name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><ChefHat className="w-5 h-5 text-gray-400" /></div>
+                  }
+                </div>
+                <div>
+                  <div className="font-bold text-gray-900">{meal.name}</div>
+                  <div className="text-sm text-gray-500">{meal.caloriesPerServing} cal · {meal.pricePerServing} EGP/serving</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500">Qty</label>
+                  <input
+                    type="number" min="0"
+                    value={meal.stockQuantity || ''}
+                    placeholder="—"
+                    onChange={e => {
+                      const qty = Number(e.target.value);
+                      updateMeal(meal._id, { stockQuantity: qty, inStock: qty > 0 });
+                    }}
+                    className="input-field !w-20 !py-1.5 !px-2 text-sm text-center"
+                  />
+                </div>
+                <button
+                  onClick={() => updateMeal(meal._id, { inStock: !meal.inStock })}
+                  className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
+                    meal.inStock ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'
+                  }`}
+                >
+                  {meal.inStock ? '✓ In Stock' : '✗ Out of Stock'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── AdminMeals — full CRUD ─────────────────────────────────────────
+const EMPTY_MEAL_FORM = {
+  name: '', description: '', dietType: 'standard', cuisine: '',
+  allergens: [], image: '', ingredients: [],
+};
+
+function AdminMeals() {
+  const [meals, setMeals]               = useState([]);
+  const [ingredients, setIngredients]   = useState([]);   // all ingredients from DB
+  const [loading, setLoading]           = useState(true);
+  const [drawerOpen, setDrawerOpen]     = useState(false);
+  const [editing, setEditing]           = useState(null);  // meal being edited, null = create
+  const [form, setForm]                 = useState(EMPTY_MEAL_FORM);
+  const [saving, setSaving]             = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [search, setSearch]             = useState('');
+  const [ingSearch, setIngSearch]       = useState('');
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/meals', { params: { limit: 200 } }),
+      api.get('/ingredients'),
+    ])
+      .then(([m, i]) => {
+        setMeals(m.data.meals || []);
+        setIngredients(i.data.ingredients || []);
+      })
+      .catch(() => toast.error('Failed to load meals'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_MEAL_FORM);
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (meal) => {
+    setEditing(meal);
+    setForm({
+      name: meal.name || '',
+      description: meal.description || '',
+      dietType: meal.dietType || 'standard',
+      cuisine: meal.cuisine || '',
+      allergens: meal.allergens || [],
+      image: meal.image || '',
+      ingredients: (meal.ingredients || []).map(i => ({
+        ingredient: i.ingredient?._id || i.ingredient,
+        quantity: i.quantity,
+      })),
+    });
+    setDrawerOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    if (form.ingredients.length === 0) { toast.error('Add at least one ingredient'); return; }
+    setSaving(true);
+    try {
+      if (editing) {
+        const { data } = await api.put(`/meals/${editing._id}`, form);
+        setMeals(prev => prev.map(m => m._id === editing._id ? data.meal : m));
+        toast.success('Meal updated');
+      } else {
+        const { data } = await api.post('/meals', form);
+        setMeals(prev => [data.meal, ...prev]);
+        toast.success('Meal created');
+      }
+      setDrawerOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/meals/${id}`);
+      setMeals(prev => prev.filter(m => m._id !== id));
+      setConfirmDelete(null);
+      toast.success('Meal deleted');
+    } catch { toast.error('Delete failed'); }
+  };
+
+  const toggleAllergen = (a) => {
+    setForm(prev => ({
+      ...prev,
+      allergens: prev.allergens.includes(a)
+        ? prev.allergens.filter(x => x !== a)
+        : [...prev.allergens, a],
+    }));
+  };
+
+  const addIngredient = (ingId) => {
+    if (form.ingredients.find(i => i.ingredient === ingId)) return;
+    setForm(prev => ({ ...prev, ingredients: [...prev.ingredients, { ingredient: ingId, quantity: 100 }] }));
+    setIngSearch('');
+  };
+
+  const removeIngredient = (ingId) => {
+    setForm(prev => ({ ...prev, ingredients: prev.ingredients.filter(i => i.ingredient !== ingId) }));
+  };
+
+  const updateIngQty = (ingId, qty) => {
+    setForm(prev => ({
+      ...prev,
+      ingredients: prev.ingredients.map(i => i.ingredient === ingId ? { ...i, quantity: Number(qty) } : i),
+    }));
+  };
+
+  const ingById = useCallback((id) => ingredients.find(i => i._id === id), [ingredients]);
+
+  const filteredMeals = meals.filter(m =>
+    m.name.toLowerCase().includes(search.toLowerCase()) ||
+    m.dietType?.toLowerCase().includes(search.toLowerCase()) ||
+    m.cuisine?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredIngredients = ingredients.filter(i =>
+    i.name.toLowerCase().includes(ingSearch.toLowerCase()) &&
+    !form.ingredients.find(fi => fi.ingredient === i._id)
+  );
+
+  if (loading) return <div className="animate-pulse h-60 bg-gray-100 rounded-2xl" />;
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <h2 className="font-display text-xl font-bold text-gray-900">Meals ({meals.length})</h2>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2 !py-2 !px-4">
+          <Plus className="w-4 h-4" /> New Meal
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search meals…"
+          className="input-field !pl-9"
+        />
+      </div>
+
+      {filteredMeals.length === 0 && <p className="text-gray-400 text-center py-10">No meals found</p>}
+
+      {/* Meal cards */}
+      <div className="space-y-3">
+        {filteredMeals.map(meal => (
+          <div key={meal._id} className="card p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Thumbnail */}
+              <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                {meal.image
+                  ? <img src={meal.image} alt={meal.name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center"><ChefHat className="w-6 h-6 text-gray-300" /></div>
+                }
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-gray-900">{meal.name}</span>
+                  <span className={`badge ${meal.inStock ? 'badge-green' : 'badge-red'}`}>
+                    {meal.inStock ? 'In Stock' : 'Out of Stock'}
+                  </span>
+                  <span className="badge badge-gray capitalize">{meal.dietType}</span>
+                </div>
+                <div className="text-sm text-gray-500 mt-0.5">
+                  {meal.cuisine} · {meal.caloriesPerServing} cal · {meal.pricePerServing} EGP/serving
+                </div>
+                {meal.allergens?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {meal.allergens.map(a => (
+                      <span key={a} className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">⚠ {a}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {confirmDelete === meal._id ? (
+                  <>
+                    <span className="text-sm text-gray-600">Delete?</span>
+                    <button onClick={() => handleDelete(meal._id)} className="px-3 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors">Yes</button>
+                    <button onClick={() => setConfirmDelete(null)} className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">No</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => openEdit(meal)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-brand-600">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setConfirmDelete(meal._id)} className="p-2 hover:bg-red-50 rounded-xl transition-colors text-gray-500 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Slide-over form */}
+      <SlideOver
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={editing ? `Edit: ${editing.name}` : 'New Meal'}
+        onSave={handleSave}
+        saving={saving}
+      >
+        {/* Name */}
+        <FormField label="Name *">
+          <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input-field" placeholder="e.g. Grilled Chicken Bowl" />
+        </FormField>
+
+        {/* Description */}
+        <FormField label="Description">
+          <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} className="input-field resize-none" placeholder="Short description…" />
+        </FormField>
+
+        {/* Diet Type */}
+        <FormField label="Diet Type">
+          <select value={form.dietType} onChange={e => setForm(p => ({ ...p, dietType: e.target.value }))} className="input-field">
+            {DIET_TYPES_MEAL.map(d => <option key={d} value={d} className="capitalize">{d}</option>)}
+          </select>
+        </FormField>
+
+        {/* Cuisine */}
+        <FormField label="Cuisine">
+          <input value={form.cuisine} onChange={e => setForm(p => ({ ...p, cuisine: e.target.value }))} className="input-field" placeholder="e.g. Mediterranean" />
+        </FormField>
+
+        {/* Allergens */}
+        <FormField label="Allergens">
+          <div className="flex flex-wrap gap-2">
+            {ALLERGEN_LIST.map(a => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => toggleAllergen(a)}
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium border transition-all capitalize ${
+                  form.allergens.includes(a)
+                    ? 'bg-amber-500 text-white border-amber-500'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-amber-300'
+                }`}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+        </FormField>
+
+        {/* Image */}
+        <ImageUploader value={form.image} onChange={url => setForm(p => ({ ...p, image: url }))} />
+
+        {/* Ingredients */}
+        <FormField label="Ingredients *">
+          {/* Search to add */}
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={ingSearch}
+              onChange={e => setIngSearch(e.target.value)}
+              placeholder="Search ingredients to add…"
+              className="input-field !pl-9"
+            />
+            {ingSearch && filteredIngredients.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto">
+                {filteredIngredients.slice(0, 10).map(ing => (
+                  <button
+                    key={ing._id}
+                    type="button"
+                    onClick={() => addIngredient(ing._id)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm flex items-center justify-between"
+                  >
+                    <span className="font-medium text-gray-900">{ing.name}</span>
+                    <span className="text-gray-400 text-xs">{ing.unit} · {ing.caloriesPerUnit} cal</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Selected ingredients */}
+          {form.ingredients.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-3 bg-gray-50 rounded-xl">No ingredients added yet</p>
+          )}
+          <div className="space-y-2">
+            {form.ingredients.map(item => {
+              const ing = ingById(item.ingredient);
+              return (
+                <div key={item.ingredient} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2">
+                  <span className="flex-1 text-sm font-medium text-gray-900">{ing?.name || item.ingredient}</span>
+                  <span className="text-xs text-gray-400">{ing?.unit}</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    value={item.quantity}
+                    onChange={e => updateIngQty(item.ingredient, e.target.value)}
+                    className="input-field !w-20 !py-1 !px-2 text-sm text-center"
+                  />
+                  <button onClick={() => removeIngredient(item.ingredient)} className="p-1 hover:text-red-500 text-gray-400 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </FormField>
+
+        {/* Computed fields — read-only after save */}
+        {editing && (
+          <div className="bg-brand-50 rounded-xl p-4 flex gap-6">
+            <div>
+              <div className="text-xs text-brand-600 font-semibold uppercase tracking-wide">Price/Serving</div>
+              <div className="text-lg font-bold text-brand-800">{editing.pricePerServing} EGP</div>
+            </div>
+            <div>
+              <div className="text-xs text-brand-600 font-semibold uppercase tracking-wide">Calories</div>
+              <div className="text-lg font-bold text-brand-800">{editing.caloriesPerServing} cal</div>
+            </div>
+            <p className="text-xs text-brand-500 self-end">Auto-calculated from ingredients</p>
+          </div>
+        )}
+      </SlideOver>
+    </div>
+  );
+}
+
+// ── AdminBoxes — full CRUD ─────────────────────────────────────────
+const EMPTY_BOX_FORM = {
+  name: '', description: '', dietType: 'mixed', image: '',
+  meals: [], isActive: true,
+};
+
+function AdminBoxes() {
+  const [boxes, setBoxes]             = useState([]);
+  const [allMeals, setAllMeals]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [drawerOpen, setDrawerOpen]   = useState(false);
+  const [editing, setEditing]         = useState(null);
+  const [form, setForm]               = useState(EMPTY_BOX_FORM);
+  const [saving, setSaving]           = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [search, setSearch]           = useState('');
+  const [mealSearch, setMealSearch]   = useState('');
+
+  // Admin needs to see inactive boxes too, so fetch without filter
+  useEffect(() => {
+    Promise.all([
+      api.get('/boxes', { params: { limit: 200 } }),
+      api.get('/meals', { params: { limit: 200 } }),
+    ])
+      .then(([b, m]) => {
+        setBoxes(b.data.boxes || []);
+        setAllMeals(m.data.meals || []);
+      })
+      .catch(() => toast.error('Failed to load boxes'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Live price preview — sum of pricePerServing from selected meals
+  const liveBasePrice = form.meals.reduce((sum, id) => {
+    const meal = allMeals.find(m => m._id === id);
+    return sum + (meal?.pricePerServing || 0);
+  }, 0);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_BOX_FORM);
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (box) => {
+    setEditing(box);
+    setForm({
+      name: box.name || '',
+      description: box.description || '',
+      dietType: box.dietType || 'mixed',
+      image: box.image || '',
+      meals: (box.meals || []).map(m => m._id || m),
+      isActive: box.isActive !== false,
+    });
+    setDrawerOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    if (form.meals.length === 0) { toast.error('Select at least one meal'); return; }
+    setSaving(true);
+    try {
+      if (editing) {
+        const { data } = await api.put(`/boxes/${editing._id}`, form);
+        setBoxes(prev => prev.map(b => b._id === editing._id ? { ...data.box, meals: data.box.meals || form.meals } : b));
+        toast.success('Box updated');
+      } else {
+        const { data } = await api.post('/boxes', form);
+        setBoxes(prev => [data.box, ...prev]);
+        toast.success('Box created');
+      }
+      setDrawerOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/boxes/${id}`);
+      // Backend soft-deletes (sets isActive: false), so update locally
+      setBoxes(prev => prev.map(b => b._id === id ? { ...b, isActive: false } : b));
+      setConfirmDelete(null);
+      toast.success('Box deactivated');
+    } catch { toast.error('Delete failed'); }
+  };
+
+  const toggleMeal = (mealId) => {
+    setForm(prev => ({
+      ...prev,
+      meals: prev.meals.includes(mealId)
+        ? prev.meals.filter(id => id !== mealId)
+        : prev.meals.length >= 10
+          ? (toast.error('Max 10 meals per box'), prev.meals)
+          : [...prev.meals, mealId],
+    }));
+  };
+
+  const toggleActive = async (box) => {
+    try {
+      await api.put(`/boxes/${box._id}`, { isActive: !box.isActive });
+      setBoxes(prev => prev.map(b => b._id === box._id ? { ...b, isActive: !b.isActive } : b));
+    } catch { toast.error('Failed to update box'); }
+  };
+
+  const filteredBoxes = boxes.filter(b =>
+    b.name?.toLowerCase().includes(search.toLowerCase()) ||
+    b.dietType?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredMealsForPicker = allMeals.filter(m =>
+    m.name.toLowerCase().includes(mealSearch.toLowerCase())
+  );
+
+  const mealById = useCallback((id) => allMeals.find(m => m._id === id), [allMeals]);
+
+  if (loading) return <div className="animate-pulse h-60 bg-gray-100 rounded-2xl" />;
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <h2 className="font-display text-xl font-bold text-gray-900">Boxes ({boxes.length})</h2>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2 !py-2 !px-4">
+          <Plus className="w-4 h-4" /> New Box
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search boxes…" className="input-field !pl-9" />
+      </div>
+
+      {filteredBoxes.length === 0 && <p className="text-gray-400 text-center py-10">No boxes found</p>}
+
+      {/* Box cards */}
+      <div className="space-y-3">
+        {filteredBoxes.map(box => (
+          <div key={box._id} className={`card p-4 transition-opacity ${!box.isActive ? 'opacity-60' : ''}`}>
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Thumbnail */}
+              <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                {box.image
+                  ? <img src={box.image} alt={box.name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center"><Boxes className="w-6 h-6 text-gray-300" /></div>
+                }
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-gray-900">{box.name}</span>
+                  <span className={`badge ${box.isActive ? 'badge-green' : 'badge-red'}`}>
+                    {box.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                  <span className="badge badge-gray capitalize">{box.dietType}</span>
+                  <span className="badge badge-blue capitalize">{box.type}</span>
+                </div>
+                <div className="text-sm text-gray-500 mt-0.5">
+                  {(box.meals?.length || 0)} meals · {box.basePrice?.toFixed(2)} EGP base price
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Active toggle */}
+                <button
+                  onClick={() => toggleActive(box)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                    box.isActive ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
+                >
+                  {box.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+
+                {confirmDelete === box._id ? (
+                  <>
+                    <span className="text-sm text-gray-600">Deactivate?</span>
+                    <button onClick={() => handleDelete(box._id)} className="px-3 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors">Yes</button>
+                    <button onClick={() => setConfirmDelete(null)} className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">No</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => openEdit(box)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-brand-600">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setConfirmDelete(box._id)} className="p-2 hover:bg-red-50 rounded-xl transition-colors text-gray-500 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Slide-over form */}
+      <SlideOver
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={editing ? `Edit: ${editing.name}` : 'New Box'}
+        onSave={handleSave}
+        saving={saving}
+      >
+        {/* Name */}
+        <FormField label="Name *">
+          <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input-field" placeholder="e.g. Classic Weekly Box" />
+        </FormField>
+
+        {/* Description */}
+        <FormField label="Description">
+          <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} className="input-field resize-none" placeholder="Short description…" />
+        </FormField>
+
+        {/* Diet Type */}
+        <FormField label="Diet Type">
+          <select value={form.dietType} onChange={e => setForm(p => ({ ...p, dietType: e.target.value }))} className="input-field">
+            {DIET_TYPES_BOX.map(d => <option key={d} value={d} className="capitalize">{d}</option>)}
+          </select>
+        </FormField>
+
+        {/* Image */}
+        <ImageUploader value={form.image} onChange={url => setForm(p => ({ ...p, image: url }))} />
+
+        {/* Active toggle */}
+        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+          <div>
+            <div className="font-semibold text-gray-900 text-sm">Active</div>
+            <div className="text-xs text-gray-500">Visible to customers on the Boxes page</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm(p => ({ ...p, isActive: !p.isActive }))}
+            className={`relative w-12 h-6 rounded-full transition-colors ${form.isActive ? 'bg-brand-500' : 'bg-gray-300'}`}
+          >
+            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.isActive ? 'translate-x-7' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {/* Meals picker */}
+        <FormField label={`Meals * (${form.meals.length}/10)`}>
+          {/* Live price */}
+          <div className="mb-3 bg-brand-50 rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="text-sm text-brand-700 font-medium">Live Base Price</span>
+            <span className="font-bold text-brand-900 text-lg">{liveBasePrice.toFixed(2)} EGP</span>
+          </div>
+
+          {/* Selected pills */}
+          {form.meals.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {form.meals.map(id => {
+                const meal = mealById(id);
+                return meal ? (
+                  <span key={id} className="flex items-center gap-1.5 bg-brand-100 text-brand-800 text-sm font-medium rounded-full px-3 py-1">
+                    {meal.name}
+                    <button type="button" onClick={() => toggleMeal(id)} className="hover:text-red-500 transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
+
+          {/* Search and pick */}
+          <div className="relative mb-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={mealSearch}
+              onChange={e => setMealSearch(e.target.value)}
+              placeholder="Search meals…"
+              className="input-field !pl-9"
+            />
+          </div>
+
+          <div className="border border-gray-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+            {filteredMealsForPicker.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-4">No meals found</p>
+            )}
+            {filteredMealsForPicker.map(meal => {
+              const selected = form.meals.includes(meal._id);
+              return (
+                <button
+                  key={meal._id}
+                  type="button"
+                  onClick={() => toggleMeal(meal._id)}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-sm border-b border-gray-100 last:border-0 transition-colors ${
+                    selected ? 'bg-brand-50' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {meal.image && (
+                      <img src={meal.image} alt={meal.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                    )}
+                    <div className="text-left">
+                      <div className="font-medium text-gray-900">{meal.name}</div>
+                      <div className="text-xs text-gray-400">{meal.pricePerServing} EGP · {meal.caloriesPerServing} cal</div>
+                    </div>
+                  </div>
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                    selected ? 'bg-brand-500 border-brand-500' : 'border-gray-300'
+                  }`}>
+                    {selected && <CheckCircle className="w-3 h-3 text-white" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </FormField>
+      </SlideOver>
+    </div>
+  );
+}
+
+// ── Admin nav ──────────────────────────────────────────────────────
 const adminNav = [
-  { to: '/admin',              label: 'Dashboard',     icon: LayoutDashboard, end: true },
-  { to: '/admin/orders',       label: 'Orders',        icon: Package },
-  { to: '/admin/subscriptions',label: 'Subscriptions', icon: Repeat },
-  { to: '/admin/users',        label: 'Users',         icon: Users },
+  { to: '/admin',               label: 'Dashboard',     icon: LayoutDashboard, end: true },
+  { to: '/admin/orders',        label: 'Orders',        icon: Package },
+  { to: '/admin/subscriptions', label: 'Subscriptions', icon: Repeat },
+  { to: '/admin/users',         label: 'Users',         icon: Users },
+  { to: '/admin/meals',         label: 'Meals',         icon: ChefHat },
+  { to: '/admin/boxes',         label: 'Boxes',         icon: Boxes },
+  { to: '/admin/inventory',     label: 'Inventory',     icon: RefreshCw },
 ];
 
-// ── AdminLayout ───────────────────────────────────────────────────
+// ── AdminLayout ────────────────────────────────────────────────────
 export default function AdminLayout() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -308,10 +1123,13 @@ export default function AdminLayout() {
 
       <div className="page-container py-8 space-y-8">
         <Routes>
-          <Route index      element={<AdminStats />} />
+          <Route index             element={<AdminStats />} />
           <Route path="orders"        element={<AdminOrders />} />
           <Route path="subscriptions" element={<AdminSubscriptions />} />
           <Route path="users"         element={<AdminUsers />} />
+          <Route path="meals"         element={<AdminMeals />} />
+          <Route path="boxes"         element={<AdminBoxes />} />
+          <Route path="inventory"     element={<AdminInventory />} />
         </Routes>
       </div>
     </div>

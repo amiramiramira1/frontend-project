@@ -1,6 +1,8 @@
 const Cart = require('../models/Cart');
 const Box = require('../models/Box');
 const Order = require('../models/Order');
+const User = require('../models/User');
+const emailService = require('../services/emailService');
 
 const SERVING_MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
 
@@ -174,6 +176,17 @@ const checkout = async (req, res) => {
     cart.items = [];
     cart.cartTotal = 0;
     await cart.save();
+
+    // Fire-and-forget order placed email (never blocks the API response)
+    User.findById(req.user.id).then((user) => {
+      if (user) {
+        const populatedOrder = { ...order.toObject(), items: cart.items };
+        emailService.sendOrderPlacedEmail(
+          { ...order.toObject(), items: orderItems.map((i, idx) => ({ ...i, box: cart.items[idx]?.box })) },
+          user
+        ).catch((err) => console.error('📧 Order placed email failed:', err.message));
+      }
+    }).catch(() => {});
 
     res.status(201).json({ message: 'Order placed successfully', order });
   } catch (error) {

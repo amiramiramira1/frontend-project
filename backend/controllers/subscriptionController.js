@@ -1,23 +1,15 @@
 const Subscription = require('../models/Subscription');
 const Box = require('../models/Box');
+const User = require('../models/User');
 const paginate = require('../utils/paginate');
-
-
-const getNextDeliveryDate = (frequency) => {
-  const now = new Date();
-  if (frequency === 'weekly') {
-    now.setDate(now.getDate() + 7);
-  } else {
-    now.setMonth(now.getMonth() + 1);
-  }
-  return now;
-};
+const { getNextDeliveryDate } = require('../jobs/subscriptionJob');
+const emailService = require('../services/emailService');
 
 // @route   POST /api/subscriptions
 // @access  Private
 const createSubscription = async (req, res) => {
   try {
-    const { boxId, servingSize, frequency } = req.body;
+    const { boxId, servingSize, frequency, deliveryDay } = req.body;
     
     const box = await Box.findById(boxId).populate('meals');
     if (!box) return res.status(404).json({ message: 'Box not found' });
@@ -37,9 +29,18 @@ const createSubscription = async (req, res) => {
       box: boxId,
       servingSize,
       frequency,
-      nextDeliveryDate: getNextDeliveryDate(frequency),
+      deliveryDay,
+      nextDeliveryDate: getNextDeliveryDate(frequency, deliveryDay),
       mealRotation: box.meals.map((m) => m._id),
     });
+
+    // Fire-and-forget subscription created email
+    User.findById(req.user.id).then((user) => {
+      if (user) {
+        emailService.sendSubscriptionEmail(subscription, user, 'created')
+          .catch((err) => console.error('📧 Subscription email failed:', err.message));
+      }
+    }).catch(() => {});
 
     res.status(201).json({ message: 'Subscription created', subscription });
   } catch (error) {
@@ -76,6 +77,15 @@ const pauseSubscription = async (req, res) => {
     subscription.status = subscription.status === 'active' ? 'paused' : 'active';
     await subscription.save();
 
+    // Fire-and-forget paused/resumed email
+    const action = subscription.status === 'paused' ? 'paused' : 'resumed';
+    User.findById(req.user.id).then((user) => {
+      if (user) {
+        emailService.sendSubscriptionEmail(subscription, user, action)
+          .catch((err) => console.error('📧 Subscription email failed:', err.message));
+      }
+    }).catch(() => {});
+
     res.status(200).json({
       message: `Subscription ${subscription.status}`,
       subscription,
@@ -95,6 +105,15 @@ const cancelSubscription = async (req, res) => {
       { new: true }
     );
     if (!subscription) return res.status(404).json({ message: 'Subscription not found' });
+
+    // Fire-and-forget subscription cancelled email
+    User.findById(req.user.id).then((user) => {
+      if (user) {
+        emailService.sendSubscriptionEmail(subscription, user, 'cancelled')
+          .catch((err) => console.error('📧 Subscription email failed:', err.message));
+      }
+    }).catch(() => {});
+
     res.status(200).json({ message: 'Subscription cancelled', subscription });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -129,10 +148,39 @@ const getAllSubscriptions = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// @route   PATCH /api/subscriptions/:id
+// @access  Private
+const updateSubscription = async (req, res) => {
+  try {
+    const { frequency, servingSize } = req.body;
+
+    const subscription = await Subscription.findOne({
+      _id: req.params.id,
+      user: req.user.id,
+    });
+    if (!subscription) return res.status(404).json({ message: 'Subscription not found' });
+    if (subscription.status === 'cancelled') {
+      return res.status(400).json({ message: 'Cannot edit a cancelled subscription' });
+    }
+
+    if (frequency) {
+      subscription.frequency = frequency;
+      subscription.nextDeliveryDate = getNextDeliveryDate(frequency);
+    }
+    if (servingSize) subscription.servingSize = servingSize;
+
+    await subscription.save();
+    res.status(200).json({ message: 'Subscription updated', subscription });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createSubscription,
   getMySubscriptions,
   pauseSubscription,
   cancelSubscription,
   getAllSubscriptions,
+  updateSubscription,
 };

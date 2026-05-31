@@ -3,31 +3,19 @@ import { ArrowRight, Clock, Users, Leaf, Star, ChevronRight, Package, Truck } fr
 import BoxCard from '../components/BoxCard';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
-
-const features = [
-  { icon: Clock, title: 'Save Time', desc: 'Pre-portioned ingredients, no meal planning or grocery shopping needed.' },
-  { icon: Leaf, title: 'Fresh & Healthy', desc: 'Chef-curated recipes with full nutritional info and allergy filtering.' },
-  { icon: Users, title: 'Flexible Sizes', desc: 'Serve 1, 2, 4, or 6 people. Perfect for singles, couples, and families.' },
-  { icon: Truck, title: 'Weekly Delivery', desc: 'Fresh box delivered to your door every week, right on schedule.' },
-];
-
-const steps = [
-  { num: '01', title: 'Choose a Box', desc: 'Pick from our curated meal boxes or build your own from scratch.' },
-  { num: '02', title: 'Select Servings', desc: 'Choose how many people you\'re cooking for.' },
-  { num: '03', title: 'We Deliver', desc: 'Fresh ingredients arrive at your door in 3-5 days.' },
-  { num: '04', title: 'Cook & Enjoy', desc: 'Follow our easy recipe cards and enjoy a delicious meal.' },
-];
+import { HOME_STATS } from '../constants/homeStats';
 
 export default function HomePage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [featuredBoxes, setFeaturedBoxes] = useState([]);
   const [recommendedBoxes, setRecommendedBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingRecommended, setLoadingRecommended] = useState(false);
 
   useEffect(() => {
-    // Fetch real boxes from API, take the first 3 as featured
     api.get('/boxes', { params: { limit: 3 } })
       .then(({ data }) => setFeaturedBoxes(data.boxes || []))
       .finally(() => setLoading(false));
@@ -44,6 +32,20 @@ export default function HomePage() {
     }
   }, [user]);
 
+  const features = [
+    { icon: Clock,  title: t('home.feat1Title'), desc: t('home.feat1Desc') },
+    { icon: Leaf,   title: t('home.feat2Title'), desc: t('home.feat2Desc') },
+    { icon: Users,  title: t('home.feat3Title'), desc: t('home.feat3Desc') },
+    { icon: Truck,  title: t('home.feat4Title'), desc: t('home.feat4Desc') },
+  ];
+
+  const steps = [
+    { num: t('home.step1Num'), title: t('home.step1Title'), desc: t('home.step1Desc') },
+    { num: t('home.step2Num'), title: t('home.step2Title'), desc: t('home.step2Desc') },
+    { num: t('home.step3Num'), title: t('home.step3Title'), desc: t('home.step3Desc') },
+    { num: t('home.step4Num'), title: t('home.step4Title'), desc: t('home.step4Desc') },
+  ];
+
   return (
     <div className="min-h-screen">
       {/* HERO */}
@@ -55,36 +57,37 @@ export default function HomePage() {
             className="w-full h-full object-cover opacity-20"
           />
         </div>
-        {/* ✅ تعديل 3: قلّلنا الـ padding على الموبايل */}
         <div className="relative page-container py-8 md:py-36">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
               <Star className="w-4 h-4 text-brand-400 fill-brand-400" />
-              <span className="text-sm font-medium">Fresh Ingredients. Real Meals.</span>
+              <span className="text-sm font-medium">{t('home.heroBadge')}</span>
             </div>
-            {/* ✅ تعديل 1: النص بيبدأ صغير على الموبايل ويكبر تدريجياً */}
             <h1 className="font-display text-3xl sm:text-5xl md:text-7xl font-black leading-tight mb-6">
-              Cook Amazing
-              <span className="block text-gradient">Meals at Home</span>
+              {t('home.heroTitle1')}
+              <span className="block text-gradient">{t('home.heroTitle2')}</span>
             </h1>
             <p className="text-xs md:text-xl text-gray-500 mb-10 leading-relaxed">
-              Pre-portioned fresh ingredients delivered weekly. Choose from our curated meal boxes or build your own. No planning, no waste, just delicious food.
+              {t('home.heroDesc')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/boxes" className="btn-primary text-lg flex items-center justify-center gap-2">
-                Explore Meal Boxes <ArrowRight className="w-5 h-5" />
+                {t('home.exploreBoxes')} <ArrowRight className="w-5 h-5" />
               </Link>
               <Link to="/build-box" className="glass text-white font-semibold px-6 py-3 rounded-xl hover:bg-white/20 transition-all flex items-center justify-center gap-2">
-                Build Custom Box
+                {t('home.buildCustom')}
               </Link>
             </div>
 
-            {/* ✅ تعديل 2: Stats مش بتتضغط على الموبايل */}
             <div className="mt-10 flex flex-wrap gap-3 md:gap-10">
-              {[['500+', 'Happy Families'], ['12+', 'Fresh Meals'], ['3-5', 'Day Delivery']].map(([val, label]) => (
-                <div key={label}>
-                  <div className="text-3xl font-display font-bold text-brand-400">{val}</div>
-                  <div className="text-sm text-gray-400 mt-0.5">{label}</div>
+              {HOME_STATS.map(({ countKey, labelKey, count }) => (
+                <div key={labelKey}>
+                  {/* count is passed as interpolation variable — locale controls formatting:
+                      en: "{{count}}+" → "500+" | ar: "+{{count}}" → "+500" */}
+                  <div className="text-3xl font-display font-bold text-brand-400">
+                    {count != null ? t(countKey, { count }) : t(countKey)}
+                  </div>
+                  <div className="text-sm text-gray-400 mt-0.5">{t(labelKey)}</div>
                 </div>
               ))}
             </div>
@@ -128,10 +131,10 @@ export default function HomePage() {
       <section className="py-10 bg-white">
         <div className="page-container">
           <div className="text-center mb-14">
-            <h2 className="section-title">Why Choose Boxify?</h2>
-            <p className="section-subtitle">Everything you need for a stress-free cooking experience</p>
+            <h2 className="section-title">{t('home.whyTitle')}</h2>
+            <p className="section-subtitle">{t('home.whySubtitle')}</p>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4  gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map(({ icon: Icon, title, desc }) => (
               <div key={title} className="card p-4 text-center group hover:-translate-y-1 transition-transform duration-300">
                 <div className="w-10 h-10 bg-gradient-to-br from-brand-100 to-brand-200 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
@@ -150,17 +153,16 @@ export default function HomePage() {
         <div className="page-container">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="section-title">Featured Boxes</h2>
-              <p className="section-subtitle mt-2 text-sm">Most popular collections</p>
+              <h2 className="section-title">{t('home.featuredTitle')}</h2>
+              <p className="section-subtitle mt-2 text-sm">{t('home.featuredSubtitle')}</p>
             </div>
-            {/* ✅ تعديل 4: "View all" بيظهر على الموبايل كمان */}
             <Link to="/boxes" className="flex items-center gap-1 text-sm whitespace-nowrap text-brand-600 font-semibold transition-all">
-  View all <ChevronRight className="w-4 h-4" />
-</Link>
+              {t('home.viewAll')} <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1  gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {[1,2,3].map(i => (
                 <div key={i} className="card h-80 animate-pulse bg-gray-100 rounded-2xl" />
               ))}
@@ -172,19 +174,18 @@ export default function HomePage() {
           )}
 
           <div className="text-center mt-8">
-            <Link to="/boxes" className="btn-outline">Browse All Boxes</Link>
+            <Link to="/boxes" className="btn-outline">{t('home.browseAll')}</Link>
           </div>
         </div>
       </section>
 
       {/* HOW IT WORKS */}
-    <section className="pt-8 pb-10 bg-white">
+      <section className="pt-8 pb-10 bg-white">
         <div className="page-container">
           <div className="text-center mb-6">
-            <h2 className="section-title">How Boxify Works</h2>
-            <p className="section-subtitle">From selection to your table in 4 simple steps</p>
+            <h2 className="section-title">{t('home.howTitle')}</h2>
+            <p className="section-subtitle">{t('home.howSubtitle')}</p>
           </div>
-          {/* ✅ تعديل 6: على الموبايل بيتوزعوا على عمودين بدل عمود واحد */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {steps.map((step, idx) => (
               <div key={step.num} className="relative text-center">
@@ -206,22 +207,21 @@ export default function HomePage() {
       <section className="py-10 bg-gradient-to-br from-brand-500 to-brand-700">
         <div className="page-container text-center text-white">
           <Package className="w-16 h-16 mx-auto mb-6 opacity-80" />
-          {/* ✅ تعديل 5: النصوص في CTA أصغر على الموبايل */}
-          <h2 className="font-display text-2xl sm:text-4xl md:text-5xl font-black mb-4">Ready to start cooking?</h2>
-          <p className="text-base md:text-xl opacity-80 mb-8">Join thousands of families enjoying fresh, home-cooked meals every week.</p>
+          <h2 className="font-display text-2xl sm:text-4xl md:text-5xl font-black mb-4">{t('home.ctaTitle')}</h2>
+          <p className="text-base md:text-xl opacity-80 mb-8">{t('home.ctaSubtitle')}</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {!user && (
               <Link to="/register" className="bg-white text-brand-600 font-bold px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-md">
-                Get Started Free
+                {t('home.ctaStartFree')}
               </Link>
             )}
             {user && (
               <Link to="/dashboard" className="bg-white text-brand-600 font-bold px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-md">
-                Go to Dashboard
+                {t('home.ctaDashboard')}
               </Link>
             )}
             <Link to="/boxes" className="border-2 border-white text-white font-bold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
-              Browse Boxes
+              {t('home.ctaBrowse')}
             </Link>
           </div>
         </div>
