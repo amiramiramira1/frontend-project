@@ -32,7 +32,7 @@ async function callAIService(endpoint, body, method = 'POST') {
 // @access  Public (but personalized features require auth)
 router.post('/chat', async (req, res) => {
   try {
-    const { message, sessionId, language } = req.body;
+    const { message, sessionId } = req.body;
     if (!message) return res.status(400).json({ error: 'Message is required' });
 
     // Extract user token from the Authorization header and forward it to the AI service
@@ -41,10 +41,10 @@ router.post('/chat', async (req, res) => {
       userToken = req.headers.authorization.split(' ')[1];
     }
 
+    // Language is auto-detected by the AI service from the message text
     const data = await callAIService('/chat', {
       message,
       session_id: sessionId || 'default',
-      language: language || 'ar',
       user_token: userToken,
     });
 

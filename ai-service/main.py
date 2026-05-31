@@ -20,7 +20,13 @@ from google.genai import types
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from datetime import datetime, timedelta
-import os, json, httpx, time
+import os, json, httpx, time, sys
+
+# Reconfigure stdout/stderr to UTF-8 to prevent UnicodeEncodeError on Windows terminals
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
 
 load_dotenv()
 
@@ -41,7 +47,7 @@ app.add_middleware(
 # ─────────────────────────────────────────────────────────────────────────────
 
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_ID = "gemini-2.0-flash"
+MODEL_ID = "gemini-2.5-flash-lite"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MONGODB (for sessions + FAQ data)
@@ -216,10 +222,11 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
+     
             if tool_name == "recommend_box":
                 params = {}
                 if args.get("dietType"):
-                    params["dietType"] = args["dietType"]
+                    params["dietType"] = args["dietType"].lower().strip()
                 if args.get("maxPrice"):
                     params["maxPrice"] = str(args["maxPrice"])
                 resp = await client.get(f"{BACKEND_URL}/api/boxes/recommended", headers=headers, params=params)
@@ -247,7 +254,7 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
                 if db is not None:
                     query_filter = {}
                     if args.get("dietType"):
-                        query_filter["dietType"] = args["dietType"]
+                        query_filter["dietType"] = args["dietType"].lower().strip()
                     meals = list(db.meals.find(query_filter, {
                         "_id": 1, "name": 1, "description": 1, "dietType": 1,
                         "pricePerServing": 1, "caloriesPerServing": 1, "allergens": 1
@@ -382,7 +389,14 @@ def save_session_message(session_id: str, role: str, content: str, user_id: str 
 # SYSTEM PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT_EN = """You are Boxify Chef 🥕, a friendly AI assistant for Boxify — an Egyptian meal kit delivery service.
+SYSTEM_PROMPT = """You are Boxify Chef 🥕, a friendly AI assistant for Boxify — an Egyptian meal kit delivery service.
+
+LANGUAGE RULE (most important):
+- Detect the language of the user's message automatically.
+- Always reply in the SAME language the user writes in.
+- If the user writes in Arabic (Egyptian dialect or Modern Standard), reply in Arabic.
+- If the user writes in English, reply in English.
+- Never mix languages in a single reply.
 
 YOUR CAPABILITIES:
 1. **FAQ**: Answer questions about Boxify policies, delivery, subscriptions, payment, etc. Use the search_faq tool first.
@@ -398,7 +412,6 @@ YOUR CAPABILITIES:
 
 IMPORTANT RULES:
 - Be warm, friendly, and concise (2-4 sentences per response)
-- Reply in English
 - When recommending boxes or meals, present them clearly with names and prices
 - NEVER invent box or meal names — only use data from tools
 - When user wants to add something to cart, always confirm the serving size first
@@ -408,29 +421,9 @@ IMPORTANT RULES:
 - When presenting boxes from recommend_box results, include the box ID so the frontend can render cards
 - Format box recommendations as: **Box Name** — description, price, diet type"""
 
-SYSTEM_PROMPT_AR = """أنت Boxify Chef 🥕، مساعد ذكي ودود لـ Boxify — موقع مصري لتوصيل أكل صحي طازج.
-
-قدراتك:
-1. **أسئلة عامة**: رد على أسئلة عن سياسات Boxify والتوصيل والاشتراكات والدفع. استخدم search_faq الأول.
-2. **اقتراح بوكسات**: اقترح بوكسات جاهزة بناءً على تفضيلات المستخدم باستخدام recommend_box.
-3. **بناء بوكس مخصص**: ساعد المستخدم يبني بوكس خاص:
-   - اسأل عن نوع الأكل والحساسيات
-   - اعرض الوجبات المتاحة باستخدام get_available_meals
-   - خليه يختار الوجبات
-   - اسأل عن حجم التقديم (1, 2, 4, أو 6 أشخاص)
-   - اسأل لو عايز مرة واحدة أو اشتراك (أسبوعي/شهري)
-   - ابني البوكس بـ create_custom_box وأضفه للسلة بـ add_to_cart
-   - لو اشتراك، استخدم create_subscription كمان
-
-قواعد مهمة:
-- كن ودود ومختصر (2-4 جمل في كل رد) بالعربي المصري
-- لما تقترح بوكسات أو وجبات، اعرضها بوضوح بالأسماء والأسعار
-- متخترعش أسماء — استخدم بس البيانات من الأدوات
-- لما المستخدم عايز يضيف حاجة للسلة، أكد حجم التقديم الأول
-- لو المستخدم مش مسجل دخول وعايز يستخدم السلة، قله يسجل دخول الأول
-- لو السؤال مش عن أكل أو Boxify، قول بلطف إنك بتساعد في Boxify بس
-- لما تعرض بوكسات من recommend_box، اذكر الـ box ID عشان الواجهة تقدر تعرض كروت
-- شكل اقتراح البوكسات: **اسم البوكس** — الوصف، السعر، نوع الدايت"""
+def detect_language(text: str) -> str:
+    """Return 'ar' if the text contains Arabic script, otherwise 'en'."""
+    return "ar" if any("\u0600" <= ch <= "\u06FF" for ch in text) else "en"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REQUEST / RESPONSE MODELS
@@ -439,8 +432,10 @@ SYSTEM_PROMPT_AR = """أنت Boxify Chef 🥕، مساعد ذكي ودود لـ 
 class ChatRequest(BaseModel):
     message:    str
     session_id: Optional[str] = Field(default="default", alias="sessionId")
-    language:   Optional[str] = "ar"
     user_token: Optional[str] = Field(default=None, alias="userToken")
+    # `language` kept for backwards-compatibility but is now ignored —
+    # language is auto-detected from the message text.
+    language:   Optional[str] = Field(default=None, exclude=True)
     model_config = {"populate_by_name": True}
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -455,9 +450,11 @@ def root():
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
-        lang = req.language or "ar"
-        sid = req.session_id or "default"
+        sid  = req.session_id or "default"
         user_token = req.user_token
+
+        # Auto-detect language from the user's message
+        lang = detect_language(req.message)
 
         # Build conversation history from MongoDB
         history = get_session_history(sid)
@@ -472,12 +469,9 @@ async def chat(req: ChatRequest):
             elif role == "model":
                 gemini_history.append(types.Content(role="model", parts=[types.Part.from_text(text=content)]))
 
-        # Select system prompt based on language
-        system_prompt = SYSTEM_PROMPT_EN if lang == "en" else SYSTEM_PROMPT_AR
-
-        # Build the config with system instruction and tools
+        # Single unified prompt — Gemini mirrors the user's language automatically
         config = types.GenerateContentConfig(
-            system_instruction=system_prompt,
+            system_instruction=SYSTEM_PROMPT,
             tools=[TOOL_DECLARATIONS],
             temperature=0.7,
             max_output_tokens=800,
@@ -512,7 +506,7 @@ async def chat(req: ChatRequest):
                 answer = " ".join(text_parts).strip()
 
                 if not answer:
-                    answer = "Sorry, I couldn't process that. Could you rephrase?" if lang == "en" else "معلش، مش فاهم. ممكن تقول تاني؟"
+                    answer = "Sorry, I couldn't process that. Could you rephrase?"
 
                 # Save assistant response
                 save_session_message(sid, "model", answer)
@@ -536,7 +530,7 @@ async def chat(req: ChatRequest):
 
                 print(f"🔧 Tool call: {tool_name}({json.dumps(tool_args, default=str)})")
 
-                # Execute the tool
+                # Pass detected language so search_faq returns the right answer field
                 result = await execute_tool(tool_name, tool_args, user_token, lang)
                 tool_calls_made.append({
                     "tool": tool_name,
@@ -561,10 +555,9 @@ async def chat(req: ChatRequest):
             # Add function results back to conversation
             gemini_history.append(types.Content(role="user", parts=function_response_parts))
 
-        # If we hit max iterations, return what we have
+        # If we hit max iterations, return a neutral fallback
         return {
-            "answer": "I'm having trouble processing your request. Could you try again?" if lang == "en"
-                      else "في مشكلة صغيرة، ممكن تحاول تاني؟",
+            "answer": "I'm having trouble processing your request. Could you try again?",
             "source": "error",
             "toolCalls": tool_calls_made,
         }
@@ -573,10 +566,8 @@ async def chat(req: ChatRequest):
         print(f"❌ Chat error: {e}")
         import traceback
         traceback.print_exc()
-        lang = req.language or "ar"
         return {
-            "answer": "Sorry, something went wrong. Please try again! 😅" if lang == "en"
-                      else "معلش حصلت مشكلة صغيرة، ممكن تعيد السؤال؟ 😅",
+            "answer": "Sorry, something went wrong. Please try again! 😅",
             "source": "error",
         }
 
