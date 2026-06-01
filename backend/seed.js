@@ -385,7 +385,7 @@ const seed = async () => {
         allergens: ['dairy'], image: imgButterChicken,
         ...calcTotals(meal17Ings),
       },
-    ]);
+    ].map(m => ({ ...m, inStock: true, stockQuantity: 100 })));
     console.log('✅ Meals seeded');
 
     // --- Seed Boxes (6 Casual Egyptian Categories) ---
