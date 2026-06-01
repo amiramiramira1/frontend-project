@@ -8,6 +8,11 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('boxify_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  
+  // Set Accept-Language header for backend localization
+  const lng = localStorage.getItem('i18nextLng') || 'en';
+  config.headers['Accept-Language'] = lng;
+  
   return config;
 });
 

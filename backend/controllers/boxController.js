@@ -3,6 +3,37 @@ const Meal = require('../models/Meal');
 const Order = require('../models/Order');
 const paginate = require('../utils/paginate');
 
+// Helper to translate "Arabic (English/Franco)" format based on Accept-Language
+const localizeField = (text, lang) => {
+  if (!text || typeof text !== 'string') return text;
+  const match = text.match(/^(.*?)\s*\((.*?)\)$/s);
+  if (match) {
+    const arVal = match[1].trim();
+    const enVal = match[2].trim();
+    return (lang && lang.startsWith('ar')) ? arVal : enVal;
+  }
+  return text;
+};
+
+const localizeMeal = (meal, lang) => {
+  if (!meal) return meal;
+  const m = typeof meal.toObject === 'function' ? meal.toObject() : meal;
+  m.name = localizeField(m.name, lang);
+  m.description = localizeField(m.description, lang);
+  return m;
+};
+
+const localizeBox = (box, lang) => {
+  if (!box) return box;
+  const b = typeof box.toObject === 'function' ? box.toObject() : box;
+  b.name = localizeField(b.name, lang);
+  b.description = localizeField(b.description, lang);
+  if (b.meals && Array.isArray(b.meals)) {
+    b.meals = b.meals.map(m => localizeMeal(m, lang));
+  }
+  return b;
+};
+
 // Helper: calculate box base price from its meals
 const calculateBoxPrice = async (mealIds) => {
   const meals = await Meal.find({ _id: { $in: mealIds } });
@@ -33,12 +64,17 @@ const getBoxes = async (req, res) => {
       { path: 'meals', populate: { path: 'ingredients.ingredient' } }
     );
 
-    // Add computed price for the requested serving size to each box
-    const boxes = result.data.map((box) => ({
-      ...box.toObject(),
-      priceForServing: parseFloat((box.basePrice * multiplier).toFixed(2)),
-      requestedServingSize: servingSize,
-    }));
+    const lang = req.headers['accept-language'] || 'en';
+
+    // Add computed price and localize each box
+    const boxes = result.data.map((box) => {
+      const b = localizeBox(box, lang);
+      return {
+        ...b,
+        priceForServing: parseFloat((b.basePrice * multiplier).toFixed(2)),
+        requestedServingSize: servingSize,
+      };
+    });
 
     res.status(200).json({
       boxes,
@@ -58,7 +94,9 @@ const getBox = async (req, res) => {
       populate: { path: 'ingredients.ingredient' },
     });
     if (!box) return res.status(404).json({ message: 'Box not found' });
-    res.status(200).json({ box });
+    
+    const lang = req.headers['accept-language'] || 'en';
+    res.status(200).json({ box: localizeBox(box, lang) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -289,13 +327,17 @@ const getRecommendedBoxes = async (req, res) => {
     const servingSize = parseInt(req.query.servingSize) || 2;
     const multiplier = SERVING_MULTIPLIERS[servingSize] || 1;
 
+    const lang = req.headers['accept-language'] || 'en';
     const scoredBoxes = boxes
-      .map(box => ({
-        ...box.toObject(),
-        relevanceScore: scoreBox(box, context),
-        priceForServing: parseFloat((box.basePrice * multiplier).toFixed(2)),
-        requestedServingSize: servingSize,
-      }))
+      .map(box => {
+        const b = localizeBox(box, lang);
+        return {
+          ...b,
+          relevanceScore: scoreBox(box, context),
+          priceForServing: parseFloat((b.basePrice * multiplier).toFixed(2)),
+          requestedServingSize: servingSize,
+        };
+      })
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, limit);
 
