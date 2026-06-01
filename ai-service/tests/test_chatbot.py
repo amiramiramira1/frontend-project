@@ -185,6 +185,51 @@ class TestSearchFaq:
         assert result is not None
         assert "cancel" in result.lower()
 
+    # ── Fuzzy Matching & Typo Resilience Tests ─────────────────────────────────
+
+    def test_arabic_letter_normalization(self):
+        """Arabic letter variations like Alefs, Teh Marbutas, and Yehs are unified."""
+        # 'إلغاء' with Hamza, 'إشتراكي' with Hamza and 'ي' at end instead of 'ى'
+        result = self.search_faq("كيف إلغاء إشتراكي", language="ar")
+        assert result is not None
+        assert "الإلغاء" in result or "إعدادات حسابك" in result or "يمكنك" in result
+
+    def test_arabic_prefix_stripping(self):
+        """Arabic prefixes like 'الـ' and 'بالـ' are stripped and matched correctly."""
+        # 'بالتوصيل' instead of 'التوصيل'
+        result = self.search_faq("ما هي سياسة بالتوصيل", language="ar")
+        assert result is not None
+        assert "يومين" in result
+
+    def test_typo_resilience_arabic(self):
+        """Arabic spelling typos are handled gracefully by fuzzy sequence matching."""
+        # 'التوسيل' instead of 'التوصيل'
+        result = self.search_faq("سياسة التوسيل", language="ar")
+        assert result is not None
+        assert "يومين" in result
+
+    def test_typo_resilience_english(self):
+        """English typos (substitutions/omissions) are resolved gracefully."""
+        # 'subscribtion' instead of 'subscription'
+        result = self.search_faq("how cancel subscribtion", language="en")
+        assert result is not None
+        assert "cancel" in result.lower()
+
+    def test_english_stemming(self):
+        """English plural and participle suffixes are stemmed (ies, ing, ed, s)."""
+        # 'deliveries' (ies -> y) should match 'delivery'
+        result = self.search_faq("what is the deliveries policy", language="en")
+        assert result is not None
+        assert "2 business days" in result
+
+    def test_out_of_order_query(self):
+        """Query with out-of-order words matches the target correctly."""
+        # 'دفع طرق' instead of 'طرق الدفع'
+        result = self.search_faq("دفع طرق", language="ar")
+        assert result is not None
+        assert "فيزا" in result
+
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. Unit tests — execute_tool()

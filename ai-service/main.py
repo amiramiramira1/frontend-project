@@ -20,7 +20,7 @@ from google.genai import types
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from datetime import datetime, timedelta
-import os, json, httpx, time, sys
+import os, json, httpx, time, sys, re, difflib
 
 # Reconfigure stdout/stderr to UTF-8 to prevent UnicodeEncodeError on Windows terminals
 if hasattr(sys.stdout, 'reconfigure'):
@@ -74,53 +74,134 @@ except Exception as e:
 
 dataset: list = []
 dataset_path = os.path.join(os.path.dirname(__file__), '..', 'backend', 'dataset.json')
+
+def normalize_text(text: str, language: str = "ar") -> str:
+    if not text:
+        return ""
+    text = text.lower().strip()
+    
+    if language != "en":
+        # Strip Arabic diacritics (harakat)
+        text = re.sub(r"[\u064B-\u065F]", "", text)
+        # Unify letters
+        text = re.sub(r"[إأآ]", "ا", text)
+        text = re.sub(r"ة", "ه", text)
+        text = re.sub(r"ى", "ي", text)
+        text = re.sub(r"[ؤئ]", "ء", text)
+        # Remove punctuation
+        text = re.sub(r"[؟!\.,;\-\?\/_]", " ", text)
+        # Strip prefixes
+        words = []
+        for w in text.split():
+            if w.startswith("ال") and len(w) > 4:
+                w = w[2:]
+            elif w.startswith("لل") and len(w) > 4:
+                w = w[2:]
+            elif w.startswith("بال") and len(w) > 5:
+                w = w[3:]
+            elif (w.startswith("ب") or w.startswith("ل") or w.startswith("ف") or w.startswith("و")) and len(w) > 4:
+                w = w[1:]
+            words.append(w)
+        return " ".join(words)
+    else:
+        # English normalization
+        text = re.sub(r"[^a-z0-9\s]", " ", text)
+        words = []
+        for w in text.split():
+            if len(w) > 4:
+                if w.endswith("ies"):
+                    w = w[:-3] + "y"
+                elif w.endswith("ing"):
+                    w = w[:-3]
+                elif w.endswith("ed"):
+                    w = w[:-2]
+                elif w.endswith("s") and not w.endswith("ss"):
+                    w = w[:-1]
+            words.append(w)
+        return " ".join(words)
+
 if os.path.exists(dataset_path):
     with open(dataset_path, 'r', encoding='utf-8') as f:
         dataset = json.load(f)
     print(f"✅ FAQ dataset loaded: {len(dataset)} items")
+    # Pre-normalize dataset questions for blazing-fast search
+    for item in dataset:
+        item['question_en_norm'] = normalize_text(item.get('question_en') or '', 'en')
+        item['question_ar_norm'] = normalize_text(item.get('question_ar') or '', 'ar')
+    print("✅ FAQ dataset pre-normalized")
 else:
     print("⚠️ dataset.json not found")
 
 
 def search_faq(query: str, language: str = "ar") -> Optional[str]:
-    """Search the FAQ dataset for matching answers."""
-    q = query.lower().strip()
-    if len(q) < 4:
+    """Search the FAQ dataset for matching answers using a two-stage fuzzy matching algorithm."""
+    q = query.strip()
+    if len(q) < 3:
         return None
-
+        
+    q_norm = normalize_text(query, language)
+    q_words = set(q_norm.split())
+    
+    # Stage 1: Candidate pre-filtering (Fast word overlap & containment check)
+    candidates = []
+    for item in dataset:
+        # Lazy/dynamic pre-normalization to support test suite dataset patching
+        if 'question_en_norm' not in item:
+            item['question_en_norm'] = normalize_text(item.get('question_en') or '', 'en')
+        if 'question_ar_norm' not in item:
+            item['question_ar_norm'] = normalize_text(item.get('question_ar') or '', 'ar')
+            
+        target_norm = item['question_ar_norm'] if language != 'en' else item['question_en_norm']
+        other_norm = item['question_en_norm'] if language != 'en' else item['question_ar_norm']
+        
+        score = 0
+        for qw in q_words:
+            if len(qw) >= 2:
+                if qw in target_norm:
+                    score += 3
+                elif qw in other_norm:
+                    score += 1.5
+                    
+        len_diff = abs(len(q_norm) - len(target_norm))
+        candidates.append((item, score, target_norm, other_norm, len_diff))
+        
+    # Sort candidates by overlap score descending, then length difference ascending
+    candidates.sort(key=lambda x: (-x[1], x[4]))
+    top_candidates = candidates[:50]
+    
+    # Stage 2: Heavy fuzzy scoring (SequenceMatcher, substring bonus, sorted ratios)
     best_match = None
     best_score = 0
-
-    for item in dataset:
-        en = (item.get('question_en') or '').lower()
-        ar = (item.get('question_ar') or '').lower()
-
-        # Simple keyword matching with scoring
-        score = 0
-        q_words = set(q.split())
-
-        for word in q_words:
-            if len(word) >= 3:  # Skip very short words
-                if word in en:
-                    score += 1
-                if word in ar:
-                    score += 1
-
-        # Exact substring match gets high score
-        if q in en or en in q:
-            score += 10
-        if q in ar or ar in q:
-            score += 10
-
-        if score > best_score:
+    threshold = 10.0
+    
+    for item, fast_score, target_norm, other_norm, len_diff in top_candidates:
+        seq_ratio = difflib.SequenceMatcher(None, q_norm, target_norm).ratio()
+        seq_ratio_other = difflib.SequenceMatcher(None, q_norm, other_norm).ratio()
+        best_ratio = max(seq_ratio, seq_ratio_other)
+        
+        total_score = best_ratio * 12 + fast_score
+        
+        # Substring containment bonus
+        if q_norm in target_norm or target_norm in q_norm:
+            total_score += 6
+        elif q_norm in other_norm or other_norm in q_norm:
+            total_score += 3
+            
+        # Word-order robust ratio
+        sorted_q = " ".join(sorted(q_norm.split()))
+        sorted_target = " ".join(sorted(target_norm.split()))
+        sorted_ratio = difflib.SequenceMatcher(None, sorted_q, sorted_target).ratio()
+        total_score += sorted_ratio * 4
+        
+        if total_score > best_score:
             answer = (item.get('answer_ar') if language != 'en'
                       else (item.get('answer') or item.get('answer_ar')))
             val = str(answer or '').strip()
-            if val and val != 'nan' and val:
-                best_score = score
+            if val and val != 'nan':
+                best_score = total_score
                 best_match = val
-
-    return best_match if best_score >= 2 else None
+                
+    return best_match if best_score >= threshold else None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TOOL DEFINITIONS (Gemini Function Declarations)
