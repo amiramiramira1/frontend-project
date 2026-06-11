@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const Subscription = require('../models/Subscription');
 const Order = require('../models/Order');
 const Box = require('../models/Box');
+const { decrementIngredientsForOrder } = require('../utils/inventoryHelper');
 
 const SERVING_MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
 
@@ -73,7 +74,7 @@ const processSubscriptions = async () => {
       const priceAtPurchase = parseFloat((box.basePrice * multiplier).toFixed(2));
 
       // Create the delivery order
-      await Order.create({
+      const order = await Order.create({
         user: subscription.user,
         items: [
           {
@@ -88,6 +89,9 @@ const processSubscriptions = async () => {
         subscription: subscription._id,
         status: 'confirmed',
       });
+
+      // Decrement ingredient stocks proportionally
+      await decrementIngredientsForOrder(order);
 
       // Advance to the next delivery, honouring the user's preferred day
       subscription.nextDeliveryDate = getNextDeliveryDate(

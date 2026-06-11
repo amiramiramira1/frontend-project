@@ -485,5 +485,18 @@
     "addToCart": "أضف إلى السلة",
     "subscribeWeekly": "اشتراك أسبوعي",
     "subscribe": "اشتراك"
+  },
+  "mealDetails": {
+    "title": "تفاصيل الوجبة",
+    "ingredients": "المكونات",
+    "cuisine": "المطبخ",
+    "diet": "نوع النظام الغذائي",
+    "calories": "السعرات الحرارية",
+    "price": "السعر لكل حصة",
+    "inStock": "متوفر",
+    "lowStock": "كمية محدودة جداً!",
+    "outOfStock": "غير متوفر",
+    "allergens": "مسببات الحساسية",
+    "viewDetails": "عرض التفاصيل"
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package } from 'lucide-react';
+
 import toast from 'react-hot-toast';
 
 /**
@@ -42,9 +42,7 @@ export default function GoogleCallbackPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-      <div className="w-16 h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded-2xl flex items-center justify-center animate-pulse">
-        <Package className="w-8 h-8 text-white" />
-      </div>
+      <img src="/logo.png" alt="Boxify Logo" className="w-20 h-20 object-contain animate-pulse mx-auto mb-4" />
       <p className="text-gray-600 font-medium text-lg">Signing you in with Google…</p>
     </div>
   );

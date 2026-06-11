@@ -268,7 +268,15 @@ export default function BuildBoxPage() {
                         )}
                       </div>
                       <div className="p-3">
-                        <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-1">{meal.name}</h3>
+                        <div className="flex justify-between items-start gap-2 mb-1">
+                          <h3 className="font-semibold text-gray-900 text-sm leading-tight flex-1">{meal.name}</h3>
+                          <button
+                            onClick={() => navigate(`/meals/${meal._id}`)}
+                            className="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline shrink-0"
+                          >
+                            {t('mealDetails.viewDetails', { defaultValue: 'View Details' })}
+                          </button>
+                        </div>
                         <div className="flex gap-3 mb-3 text-xs text-gray-500">
                           <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" /> {meal.caloriesPerServing} {t('buildBox.cal')}</span>
                           <span className="font-medium text-brand-600">{(meal.pricePerServing * servings).toFixed(0)} EGP</span>
@@ -317,7 +325,15 @@ export default function BuildBoxPage() {
                       <div key={meal._id} className={`card overflow-hidden ring-1 bg-brand-50/30 ${isAdded ? 'ring-brand-500' : 'ring-brand-200'}`}>
                         <img src={meal.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400'} alt={meal.name} className="w-full h-28 object-cover" />
                         <div className="p-3">
-                          <h3 className="font-semibold text-gray-900 text-sm">{meal.name}</h3>
+                          <div className="flex justify-between items-start gap-2 mb-1">
+                            <h3 className="font-semibold text-gray-900 text-sm flex-1">{meal.name}</h3>
+                            <button
+                              onClick={() => navigate(`/meals/${meal._id}`)}
+                              className="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline shrink-0"
+                            >
+                              {t('mealDetails.viewDetails', { defaultValue: 'View Details' })}
+                            </button>
+                          </div>
                           <div className="flex gap-3 mt-1 mb-2 text-xs text-gray-500">
                             <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />{meal.caloriesPerServing} {t('buildBox.cal')}</span>
                             <span className="font-medium text-brand-600">{(meal.pricePerServing * servings).toFixed(0)} EGP</span>

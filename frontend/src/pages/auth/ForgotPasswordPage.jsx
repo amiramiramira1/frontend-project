@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 
@@ -27,9 +27,7 @@ export default function ForgotPasswordPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-hero-pattern items-center justify-center relative overflow-hidden">
         <img src="https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800" alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
         <div className="relative text-white text-center p-12">
-          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <Package className="w-10 h-10 text-brand-400" />
-          </div>
+          <img src="/logo.png" alt="Boxify Logo" className="w-28 h-28 object-contain mx-auto mb-6 bg-white/20 backdrop-blur-sm p-4 rounded-3xl" />
           <h2 className="font-display text-4xl font-black mb-4">{t('forgot.panelTitle')}</h2>
           <p className="text-lg text-gray-300 max-w-sm">{t('forgot.panelSubtitle')}</p>
         </div>
@@ -39,9 +37,7 @@ export default function ForgotPasswordPage() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
+              <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain" />
               <span className="font-display text-2xl font-bold">Boxify</span>
             </Link>
 

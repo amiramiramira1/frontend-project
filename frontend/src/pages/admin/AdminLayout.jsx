@@ -136,7 +136,7 @@ function AdminStats() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Orders',         value: stats?.totalOrders,                            color: 'from-blue-500 to-blue-600',     icon: Package },
-          { label: 'Revenue (Delivered)',  value: `${stats?.totalRevenue?.toLocaleString()} EGP`, color: 'from-brand-400 to-brand-600',   icon: BarChart3 },
+          { label: 'Revenue (Paid)',       value: `${stats?.totalRevenue?.toLocaleString()} EGP`, color: 'from-brand-400 to-brand-600',   icon: BarChart3 },
           { label: 'Active Subscriptions', value: subStats?.active,                              color: 'from-green-500 to-green-600',   icon: Repeat },
           { label: 'Total Users',          value: stats?.totalUsers,                             color: 'from-purple-500 to-purple-600', icon: Users },
           { label: 'Active Boxes',         value: stats?.totalBoxes,                             color: 'from-orange-400 to-orange-600', icon: Boxes },
@@ -354,26 +354,66 @@ function AdminUsers() {
   );
 }
 
-// ── AdminInventory (stock-only quick view) ─────────────────────────
+// ── AdminInventory (dual-tab quick view) ─────────────────────────
 function AdminInventory() {
+  const [activeTab, setActiveTab] = useState('meals'); // 'meals' or 'ingredients'
   const [meals, setMeals] = useState([]);
+  const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.get('/meals', { params: { limit: 100 } })
-      .then(({ data }) => setMeals(data.meals || []))
-      .catch(() => toast.error('Failed to load meals'))
-      .finally(() => setLoading(false));
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [mRes, iRes] = await Promise.all([
+        api.get('/meals', { params: { limit: 200 } }),
+        api.get('/ingredients', { params: { limit: 200 } })
+      ]);
+      setMeals(mRes.data.meals || []);
+      setIngredients(iRes.data.ingredients || []);
+    } catch {
+      toast.error('Failed to load inventory data');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const updateMeal = async (id, changes) => {
     setMeals(prev => prev.map(m => m._id === id ? { ...m, ...changes } : m));
     try {
       await api.put(`/meals/${id}`, changes);
-      toast.success('Meal updated');
+      toast.success('Meal override updated');
+      // Refetch to calculate dynamic stock quantities across other meals
+      const [mRes, iRes] = await Promise.all([
+        api.get('/meals', { params: { limit: 200 } }),
+        api.get('/ingredients', { params: { limit: 200 } })
+      ]);
+      setMeals(mRes.data.meals || []);
+      setIngredients(iRes.data.ingredients || []);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update meal');
-      api.get('/meals', { params: { limit: 100 } }).then(({ data }) => setMeals(data.meals || []));
+      fetchData();
+    }
+  };
+
+  const updateIngredient = async (id, changes) => {
+    setIngredients(prev => prev.map(i => i._id === id ? { ...i, ...changes } : i));
+    try {
+      await api.put(`/ingredients/${id}`, changes);
+      toast.success('Ingredient updated');
+      // Refetch to calculate dynamic stock quantities across other meals
+      const [mRes, iRes] = await Promise.all([
+        api.get('/meals', { params: { limit: 200 } }),
+        api.get('/ingredients', { params: { limit: 200 } })
+      ]);
+      setMeals(mRes.data.meals || []);
+      setIngredients(iRes.data.ingredients || []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update ingredient');
+      fetchData();
     }
   };
 
@@ -381,51 +421,102 @@ function AdminInventory() {
 
   return (
     <div>
-      <h2 className="font-display text-xl font-bold mb-4">Inventory ({meals.length} meals)</h2>
-      {meals.length === 0 && <p className="text-gray-400 text-center py-10">No meals found</p>}
-      <div className="space-y-3">
-        {meals.map(meal => (
-          <div key={meal._id} className="card p-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                  {meal.image
-                    ? <img src={meal.image} alt={meal.name} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center"><ChefHat className="w-5 h-5 text-gray-400" /></div>
-                  }
+      {/* Tab Header */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <h2 className="font-display text-xl font-bold text-gray-900">Inventory Management</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('meals')}
+            className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all ${activeTab === 'meals' ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Meals Stock ({meals.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('ingredients')}
+            className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all ${activeTab === 'ingredients' ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Ingredients Stock ({ingredients.length})
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'meals' ? (
+        <div className="space-y-3">
+          {meals.length === 0 && <p className="text-gray-400 text-center py-10">No meals found</p>}
+          {meals.map(meal => (
+            <div key={meal._id} className="card p-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                    {meal.image
+                      ? <img src={meal.image} alt={meal.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center"><ChefHat className="w-5 h-5 text-gray-400" /></div>
+                    }
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900">{meal.name}</div>
+                    <div className="text-sm text-gray-500">
+                      Calculated Qty: <span className="font-semibold text-brand-600">{meal.stockQuantity}</span> servings
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-bold text-gray-900">{meal.name}</div>
-                  <div className="text-sm text-gray-500">{meal.caloriesPerServing} cal · {meal.pricePerServing} EGP/serving</div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => updateMeal(meal._id, { inStock: !meal.inStock })}
+                    className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
+                      meal.inStock ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                  >
+                    {meal.inStock ? '✓ In Stock' : '✗ Out of Stock'}
+                  </button>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-500">Qty</label>
-                  <input
-                    type="number" min="0"
-                    value={meal.stockQuantity || ''}
-                    placeholder="—"
-                    onChange={e => {
-                      const qty = Number(e.target.value);
-                      updateMeal(meal._id, { stockQuantity: qty, inStock: qty > 0 });
-                    }}
-                    className="input-field !w-20 !py-1.5 !px-2 text-sm text-center"
-                  />
-                </div>
-                <button
-                  onClick={() => updateMeal(meal._id, { inStock: !meal.inStock })}
-                  className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
-                    meal.inStock ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'
-                  }`}
-                >
-                  {meal.inStock ? '✓ In Stock' : '✗ Out of Stock'}
-                </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {ingredients.length === 0 && <p className="text-gray-400 text-center py-10">No ingredients found</p>}
+          {ingredients.map(ing => (
+            <div key={ing._id} className="card p-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0 text-brand-600 font-bold">
+                    {ing.name?.[0]?.toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900">{ing.name}</div>
+                    <div className="text-sm text-gray-500">Unit: {ing.unit} · {ing.costPerUnit} EGP/unit</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500">Qty ({ing.unit})</label>
+                    <input
+                      type="number" min="0"
+                      value={ing.stockQuantity || ''}
+                      placeholder="—"
+                      onChange={e => {
+                        const qty = Number(e.target.value);
+                        updateIngredient(ing._id, { stockQuantity: qty, inStock: qty > 0 });
+                      }}
+                      className="input-field !w-24 !py-1.5 !px-2 text-sm text-center"
+                    />
+                  </div>
+                  <button
+                    onClick={() => updateIngredient(ing._id, { inStock: !ing.inStock })}
+                    className={`px-4 py-1.5 rounded-xl text-sm font-semibold transition-colors ${
+                      ing.inStock ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                  >
+                    {ing.inStock ? '✓ In Stock' : '✗ Out of Stock'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -451,7 +542,7 @@ function AdminMeals() {
   useEffect(() => {
     Promise.all([
       api.get('/meals', { params: { limit: 200 } }),
-      api.get('/ingredients'),
+      api.get('/ingredients', { params: { limit: 200 } }),
     ])
       .then(([m, i]) => {
         setMeals(m.data.meals || []);
@@ -783,7 +874,7 @@ function AdminBoxes() {
   // Admin needs to see inactive boxes too, so fetch without filter
   useEffect(() => {
     Promise.all([
-      api.get('/boxes', { params: { limit: 200 } }),
+      api.get('/boxes', { params: { limit: 200, includeInactive: true } }),
       api.get('/meals', { params: { limit: 200 } }),
     ])
       .then(([b, m]) => {

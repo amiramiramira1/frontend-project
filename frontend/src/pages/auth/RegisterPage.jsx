@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function RegisterPage() {
@@ -47,9 +47,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
+              <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain" />
               <span className="font-display text-2xl font-bold">Boxify</span>
             </Link>
             <h1 className="font-display text-3xl font-bold text-gray-900">{t('register.heading')}</h1>

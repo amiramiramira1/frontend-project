@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
@@ -42,9 +42,7 @@ export default function LoginPage() {
           className="absolute inset-0 w-full h-full object-cover opacity-20"
         />
         <div className="relative text-white text-center p-12">
-          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <Package className="w-10 h-10 text-brand-400" />
-          </div>
+          <img src="/logo.png" alt="Boxify Logo" className="w-28 h-28 object-contain mx-auto mb-6 bg-white/20 backdrop-blur-sm p-4 rounded-3xl" />
           <h2 className="font-display text-4xl font-black mb-4">
             {t('login.panelTitle')}
           </h2>
@@ -61,9 +59,7 @@ export default function LoginPage() {
           {/* Logo + heading */}
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
+              <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain" />
               <span className="font-display text-2xl font-bold">Boxify</span>
             </Link>
 

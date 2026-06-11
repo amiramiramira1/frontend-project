@@ -12,6 +12,7 @@ import HomePage from './pages/HomePage';
 import BoxesPage from './pages/BoxesPage';
 import BoxComparePage from './pages/BoxComparePage';
 import BoxDetailPage from './pages/BoxDetailPage';
+import MealDetailPage from './pages/MealDetailPage';
 import BuildBoxPage from './pages/BuildBoxPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
@@ -49,6 +50,7 @@ function AppRoutes() {
       <Route path="/boxes" element={<AppLayout><BoxesPage /></AppLayout>} />
       <Route path="/compare" element={<AppLayout><BoxComparePage /></AppLayout>} />
       <Route path="/boxes/:id" element={<AppLayout><BoxDetailPage /></AppLayout>} />
+      <Route path="/meals/:id" element={<AppLayout><MealDetailPage /></AppLayout>} />
       <Route path="/build-box" element={<AppLayout><BuildBoxPage /></AppLayout>} />
       <Route path="/cart" element={<AppLayout><CartPage /></AppLayout>} />
       <Route path="/checkout" element={<AppLayout><CheckoutPage /></AppLayout>} />

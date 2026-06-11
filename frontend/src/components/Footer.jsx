@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Package, Instagram, Twitter, Facebook, Mail, ChevronDown } from 'lucide-react';
+import { Instagram, Twitter, Facebook, Mail, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,9 +35,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-1 mb-0">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
+              <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain" />
               <span className="font-display text-xl font-bold text-white">Boxify</span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed mb-4">

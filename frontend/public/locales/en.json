@@ -485,5 +485,18 @@
     "addToCart": "Add to Cart",
     "subscribeWeekly": "Subscribe Weekly",
     "subscribe": "Subscribe"
+  },
+  "mealDetails": {
+    "title": "Meal Details",
+    "ingredients": "Ingredients",
+    "cuisine": "Cuisine",
+    "diet": "Diet Type",
+    "calories": "Calories",
+    "price": "Price per serving",
+    "inStock": "In Stock",
+    "lowStock": "Only a few left!",
+    "outOfStock": "Out of Stock",
+    "allergens": "Allergens",
+    "viewDetails": "View Details"
   }
 }

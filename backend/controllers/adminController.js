@@ -4,6 +4,7 @@ const Box          = require('../models/Box');
 const Meal         = require('../models/Meal');
 const Subscription = require('../models/Subscription');
 const { getNextDeliveryDate } = require('../jobs/subscriptionJob');
+const { decrementIngredientsForOrder } = require('../utils/inventoryHelper');
 
 // @route   GET /api/admin/stats
 // @access  Private/Admin
@@ -16,15 +17,16 @@ const getDashboardStats = async (req, res) => {
       totalMeals,
       allOrders,
     ] = await Promise.all([
-      User.countDocuments({ role: 'customer' }),
-      Box.countDocuments({ isActive: true }),
+      User.countDocuments(),
+      Box.countDocuments({ type: 'pre-made', isActive: true }),
       Meal.countDocuments(),
       Order.find(),
     ]);
 
-    // Calculate total revenue from all delivered orders
+    // Calculate total revenue from all paid/successful orders
+    const paidStatuses = ['confirmed', 'preparing', 'shipped', 'out_for_delivery', 'delivered'];
     const totalRevenue = allOrders
-      .filter((o) => o.status === 'delivered')
+      .filter((o) => paidStatuses.includes(o.status))
       .reduce((sum, o) => sum + o.totalPrice, 0);
 
     // Count orders grouped by status
@@ -128,6 +130,9 @@ const manuallyGenerateSubscriptionOrder = async (req, res) => {
       subscription: subscription._id,
       status: 'confirmed',
     });
+
+    // Decrement ingredient stocks proportionally
+    await decrementIngredientsForOrder(order);
 
     // Advance to the next delivery on the user's preferred weekday
     subscription.nextDeliveryDate = getNextDeliveryDate(

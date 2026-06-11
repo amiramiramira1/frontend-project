@@ -57,7 +57,7 @@ exports.createMealValidator = [
     .isIn(VALID_ALLERGENS).withMessage(`Each allergen must be one of: ${VALID_ALLERGENS.join(', ')}`),
 
   body('image')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isURL().withMessage('Image must be a valid URL'),
 
@@ -113,7 +113,7 @@ exports.updateMealValidator = [
     .isIn(VALID_ALLERGENS).withMessage(`Each allergen must be one of: ${VALID_ALLERGENS.join(', ')}`),
 
   body('image')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isURL().withMessage('Image must be a valid URL'),
 ];

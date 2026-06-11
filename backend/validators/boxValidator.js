@@ -39,7 +39,7 @@ exports.createBoxValidator = [
     .isIn(VALID_DIET_TYPES).withMessage(`Diet type must be one of: ${VALID_DIET_TYPES.join(', ')}`),
 
   body('image')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isURL().withMessage('Image must be a valid URL'),
 ];
@@ -76,7 +76,7 @@ exports.updateBoxValidator = [
     .isIn(VALID_DIET_TYPES).withMessage(`Diet type must be one of: ${VALID_DIET_TYPES.join(', ')}`),
 
   body('image')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isURL().withMessage('Image must be a valid URL'),
 

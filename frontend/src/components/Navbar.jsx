@@ -36,9 +36,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-              <Package className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain group-hover:scale-105 transition-transform" />
             <span className="font-display text-xl font-bold text-gray-900">Boxify</span>
           </Link>
 

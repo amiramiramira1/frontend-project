@@ -3,6 +3,7 @@ const Box = require('../models/Box');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const emailService = require('../services/emailService');
+const { decrementIngredientsForOrder } = require('../utils/inventoryHelper');
 
 const SERVING_MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
 
@@ -171,6 +172,9 @@ const checkout = async (req, res) => {
       deliveryAddress,
       orderType: 'one-time',
     });
+
+    // Decrement ingredient stocks proportionally
+    await decrementIngredientsForOrder(order);
 
     // Clear the cart after successful checkout
     cart.items = [];

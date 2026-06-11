@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Package, Mail, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Mail, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 import toast from 'react-hot-toast';
@@ -79,9 +79,7 @@ export default function VerifyEmailPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md text-center space-y-6">
           <Link to="/" className="inline-flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
-              <Package className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain" />
             <span className="font-display text-2xl font-bold">Boxify</span>
           </Link>
           <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto">
@@ -118,9 +116,7 @@ export default function VerifyEmailPage() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
+              <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain" />
               <span className="font-display text-2xl font-bold">Boxify</span>
             </Link>
           </div>
@@ -165,9 +161,7 @@ export default function VerifyEmailPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center">
-              <Package className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="Boxify Logo" className="w-14 h-14 object-contain" />
             <span className="font-display text-2xl font-bold">Boxify</span>
           </Link>
         </div>

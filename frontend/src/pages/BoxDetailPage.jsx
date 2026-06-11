@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -39,6 +40,7 @@ export default function BoxDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
+  const { t } = useTranslation();
 
   const [box, setBox] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -190,32 +192,39 @@ export default function BoxDetailPage() {
               <h2 className="font-display text-2xl font-bold mb-4">What's Included</h2>
               <div className="grid grid-cols-1 gap-4">
                 {box.meals?.map((meal) => (
-                  <div key={meal._id} className="card p-4 flex gap-4">
-                    <img
-                      src={meal.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'}
-                      alt={meal.name}
-                      className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-gray-900 line-clamp-2">{meal.name}</h3>
-                      <p className="text-xs text-gray-400 mt-0.5 mb-2 line-clamp-2">{meal.description}</p>
-                      <div className="flex gap-3 text-xs text-gray-500">
-                        {/* prepTime doesn't exist in backend model — omitted */}
-                        <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> {meal.caloriesPerServing} cal</span>
-                        <span className="font-medium text-brand-600">
-                          {(meal.pricePerServing * MULTIPLIERS[servings]).toFixed(0)} EGP
-                        </span>
-                        <span className="capitalize text-gray-400">{meal.cuisine}</span>
-                      </div>
-                      {/* dietType replaces dietaryTags array */}
-                      {meal.dietType && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${dietTagColors[meal.dietType] || 'badge-gray'}`}>
-                            {meal.dietType}
+                  <div key={meal._id} className="card p-4 flex items-center justify-between gap-4">
+                    <div className="flex gap-4 min-w-0 flex-1">
+                      <img
+                        src={meal.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'}
+                        alt={meal.name}
+                        className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-gray-900 line-clamp-2">{meal.name}</h3>
+                        <p className="text-xs text-gray-400 mt-0.5 mb-2 line-clamp-2">{meal.description}</p>
+                        <div className="flex gap-3 text-xs text-gray-500">
+                          {/* prepTime doesn't exist in backend model — omitted */}
+                          <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> {meal.caloriesPerServing} cal</span>
+                          <span className="font-medium text-brand-600">
+                            {(meal.pricePerServing * MULTIPLIERS[servings]).toFixed(0)} EGP
                           </span>
+                          <span className="capitalize text-gray-400">{meal.cuisine}</span>
                         </div>
-                      )}
+                        {meal.dietType && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${dietTagColors[meal.dietType] || 'badge-gray'}`}>
+                              {meal.dietType}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <button 
+                      onClick={() => navigate(`/meals/${meal._id}`)}
+                      className="btn-outline !py-2 !px-4 text-xs font-semibold text-brand-600 flex items-center gap-1 hover:bg-brand-500 hover:text-white transition-all shrink-0 self-center"
+                    >
+                      {t('mealDetails.viewDetails', { defaultValue: 'View Details' })} &rarr;
+                    </button>
                   </div>
                 ))}
               </div>

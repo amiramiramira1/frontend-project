@@ -20,7 +20,11 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Attach the user to the request object so controllers can access it
-    req.user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Not authorized, user not found' });
+    }
+    req.user = user;
 
     next(); // Everything is fine, move on to the controller
   } catch (error) {
