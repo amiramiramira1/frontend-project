@@ -150,7 +150,7 @@ const clearCart = async (req, res) => {
 // Converts the cart into an Order, then clears the cart
 const checkout = async (req, res) => {
   try {
-    const { deliveryAddress } = req.body;
+    const { deliveryAddress, phone, deliveryDate, timeSlot, promoCode } = req.body;
 
     const cart = await Cart.findOne({ user: req.user.id }).populate('items.box');
     if (!cart || cart.items.length === 0) {
@@ -165,11 +165,41 @@ const checkout = async (req, res) => {
       priceAtPurchase: item.pricePerItem,
     }));
 
+    // Server-side promo code validation
+    let discountPercent = 0;
+    let discountedTotal = null;
+    let appliedPromoCode = null;
+
+    if (promoCode) {
+      const PromoCode = require('../models/PromoCode');
+      const promo = await PromoCode.findOne({ code: promoCode.toUpperCase() });
+
+      if (promo && promo.isActive) {
+        const now = new Date();
+        const notExpired = !promo.expiresAt || promo.expiresAt > now;
+        const withinLimit = !promo.usageLimit || promo.usageCount < promo.usageLimit;
+
+        if (notExpired && withinLimit) {
+          discountPercent = promo.discount;
+          discountedTotal = parseFloat((cart.cartTotal - cart.cartTotal * promo.discount).toFixed(2));
+          appliedPromoCode = promo.code;
+          promo.usageCount += 1;
+          await promo.save();
+        }
+      }
+    }
+
     const order = await Order.create({
       user: req.user.id,
       items: orderItems,
       totalPrice: cart.cartTotal,
       deliveryAddress,
+      phone: phone || null,
+      deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
+      timeSlot: timeSlot || null,
+      promoCode: appliedPromoCode,
+      discountPercent,
+      discountedTotal,
       orderType: 'one-time',
     });
 
@@ -184,7 +214,6 @@ const checkout = async (req, res) => {
     // Fire-and-forget order placed email (never blocks the API response)
     User.findById(req.user.id).then((user) => {
       if (user) {
-        const populatedOrder = { ...order.toObject(), items: cart.items };
         emailService.sendOrderPlacedEmail(
           { ...order.toObject(), items: orderItems.map((i, idx) => ({ ...i, box: cart.items[idx]?.box })) },
           user

@@ -21,6 +21,7 @@ const userPayload = (user) => ({
   dietPreferences: user.dietPreferences,
   allergens:       user.allergens,
   settings:        user.settings,
+  favorites:       user.favorites || [],
   isEmailVerified: user.isEmailVerified,
 });
 

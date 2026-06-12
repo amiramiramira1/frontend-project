@@ -152,7 +152,7 @@ const getAllSubscriptions = async (req, res) => {
 // @access  Private
 const updateSubscription = async (req, res) => {
   try {
-    const { frequency, servingSize } = req.body;
+    const { frequency, servingSize, deliveryDay } = req.body;
 
     const subscription = await Subscription.findOne({
       _id: req.params.id,
@@ -163,11 +163,17 @@ const updateSubscription = async (req, res) => {
       return res.status(400).json({ message: 'Cannot edit a cancelled subscription' });
     }
 
-    if (frequency) {
-      subscription.frequency = frequency;
-      subscription.nextDeliveryDate = getNextDeliveryDate(frequency);
-    }
+    if (frequency) subscription.frequency = frequency;
     if (servingSize) subscription.servingSize = servingSize;
+    if (deliveryDay) subscription.deliveryDay = deliveryDay;
+
+    // Recalculate next delivery if frequency or deliveryDay changed
+    if (frequency || deliveryDay) {
+      subscription.nextDeliveryDate = getNextDeliveryDate(
+        subscription.frequency,
+        subscription.deliveryDay,
+      );
+    }
 
     await subscription.save();
     res.status(200).json({ message: 'Subscription updated', subscription });

@@ -452,6 +452,12 @@
     "profile":      "الملف الشخصي",
     "myOrders":     "طلباتي",
     "subscriptions":"الاشتراكات",
+    "favorites":    "المفضلة",
+    "favoritesCount": "مفضلاتي ({{count}})",
+    "noFavorites":  "لا توجد مفضلات بعد",
+    "noFavoritesDesc": "تصفح صناديقنا وانقر على القلب لحفظ مفضلاتك",
+    "browseBoxes":  "تصفح الصناديق",
+    "view":         "عرض",
     "settings":     "الإعدادات",
     "logout":       "تسجيل الخروج"
   },

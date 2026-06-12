@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { promoCodes } from '../data/mockData';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package } from 'lucide-react';
@@ -34,20 +33,26 @@ export default function CheckoutPage() {
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [promoError, setPromoError] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
 
   const discountedTotal = appliedPromo
     ? cart.cartTotal - cart.cartTotal * appliedPromo.discount
     : cart.cartTotal;
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const code = promoCode.trim().toUpperCase();
-    if (promoCodes[code]) {
-      setAppliedPromo({ code, ...promoCodes[code] });
-      setPromoError('');
-      toast.success(i18next.t('msg.promoApplied', { label: promoCodes[code].label }));
-    } else {
-      setPromoError(t('checkout.invalidPromo'));
+    if (!code) return;
+    setPromoLoading(true);
+    setPromoError('');
+    try {
+      const { data } = await api.post('/promo/validate', { code });
+      setAppliedPromo({ code: data.code, discount: data.discount, label: data.label });
+      toast.success(i18next.t('msg.promoApplied', { label: data.label }));
+    } catch (err) {
+      setPromoError(err.response?.data?.message || t('checkout.invalidPromo'));
       setAppliedPromo(null);
+    } finally {
+      setPromoLoading(false);
     }
   };
 
@@ -74,6 +79,10 @@ export default function CheckoutPage() {
           country: 'Egypt',
           postalCode: form.zip,
         },
+        phone: form.phone,
+        deliveryDate: form.deliveryDate,
+        timeSlot: form.timeSlot,
+        promoCode: appliedPromo?.code || null,
       });
 
       await fetchCart();
@@ -236,8 +245,8 @@ export default function CheckoutPage() {
                         placeholder={t('checkout.promoPh')}
                         className="input-field text-sm flex-1"
                       />
-                      <button type="button" onClick={handleApplyPromo} className="btn-primary px-4 text-sm">
-                        {t('checkout.apply')}
+                      <button type="button" onClick={handleApplyPromo} disabled={promoLoading} className="btn-primary px-4 text-sm">
+                        {promoLoading ? '...' : t('checkout.apply')}
                       </button>
                     </div>
                     {promoError && <p className="text-xs text-red-500 mt-1">{promoError}</p>}

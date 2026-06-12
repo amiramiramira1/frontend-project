@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { FavoritesProvider } from './context/FavoritesContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
@@ -30,6 +31,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import EditSubscriptionPage from './pages/dashboard/EditSubscriptionPage';
 import SettingsPage from './pages/dashboard/SettingsPage';
+import FavoritesPage from './pages/dashboard/FavoritesPage';
 import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 
 function AppLayout({ children }) {
@@ -67,6 +69,7 @@ function AppRoutes() {
         <Route index element={<ProfilePage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
+        <Route path="favorites" element={<FavoritesPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="/admin/*" element={<AdminLayout />} />
@@ -81,14 +84,16 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <CartProvider>
-            <AppRoutes />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                style: { borderRadius: '12px', fontFamily: 'Inter, sans-serif', fontSize: '14px' },
-                success: { iconTheme: { primary: '#f79408', secondary: '#fff' } },
-              }}
-            />
+            <FavoritesProvider>
+              <AppRoutes />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  style: { borderRadius: '12px', fontFamily: 'Inter, sans-serif', fontSize: '14px' },
+                  success: { iconTheme: { primary: '#f79408', secondary: '#fff' } },
+                }}
+              />
+            </FavoritesProvider>
           </CartProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -452,6 +452,12 @@
     "profile":      "Profile",
     "myOrders":     "My Orders",
     "subscriptions":"Subscriptions",
+    "favorites":    "Favorites",
+    "favoritesCount": "My Favorites ({{count}})",
+    "noFavorites":  "No favorites yet",
+    "noFavoritesDesc": "Browse our boxes and tap the heart to save your favorites",
+    "browseBoxes":  "Browse Boxes",
+    "view":         "View",
     "settings":     "Settings",
     "logout":       "Logout"
   },

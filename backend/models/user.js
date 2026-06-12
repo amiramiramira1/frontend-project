@@ -6,6 +6,7 @@ const addressSchema = new mongoose.Schema({
   city: String,
   country: String,
   postalCode: String,
+  phone: String,
 });
 
 const userSchema = new mongoose.Schema(
@@ -56,6 +57,12 @@ const userSchema = new mongoose.Schema(
       language:           { type: String, enum: ['en', 'ar'], default: 'en' },
       defaultServings:    { type: Number, min: 1, max: 10, default: 2 },
     },
+
+    // Favorited boxes
+    favorites: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Box',
+    }],
 
     // Email verification
     isEmailVerified:    { type: Boolean, default: false },

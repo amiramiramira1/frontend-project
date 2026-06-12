@@ -27,6 +27,11 @@ const subscriptionSchema = new mongoose.Schema(
       enum: ["active", "paused", "cancelled"],
       default: "active",
     },
+    deliveryDay: {
+      type: String,
+      enum: ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday'],
+      default: 'saturday',
+    },
     nextDeliveryDate: {
       type: Date,
       required: true,

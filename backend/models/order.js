@@ -57,6 +57,31 @@ const orderSchema = new mongoose.Schema(
       country: String,
       postalCode: String,
     },
+    phone: {
+      type: String,
+      default: null,
+    },
+    deliveryDate: {
+      type: Date,
+      default: null,
+    },
+    timeSlot: {
+      type: String,
+      enum: ['9AM–12PM', '12PM–3PM', '3PM–6PM', '6PM–9PM'],
+      default: null,
+    },
+    promoCode: {
+      type: String,
+      default: null,
+    },
+    discountPercent: {
+      type: Number,
+      default: 0,
+    },
+    discountedTotal: {
+      type: Number,
+      default: null, // null means no discount was applied
+    },
     subscription: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subscription",

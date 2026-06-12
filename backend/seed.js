@@ -9,6 +9,7 @@ const Meal         = require('./models/Meal');
 const Box          = require('./models/Box');
 const Subscription = require('./models/Subscription');
 const Order        = require('./models/Order');
+const PromoCode    = require('./models/PromoCode');
 const { getNextDeliveryDate } = require('./jobs/subscriptionJob');
 
 // Configure Cloudinary from .env if present
@@ -523,6 +524,15 @@ const seed = async () => {
       },
     ]);
     console.log('✅ Subscriptions seeded');
+
+    // ── Promo Codes ────────────────────────────────────────────────────
+    await PromoCode.deleteMany({});
+    await PromoCode.create([
+      { code: 'SAVE10',  discount: 0.10, label: '10% off' },
+      { code: 'SAVE20',  discount: 0.20, label: '20% off' },
+      { code: 'WELCOME', discount: 0.15, label: '15% off — Welcome discount' },
+    ]);
+    console.log('✅ Promo codes seeded');
 
     console.log('\n🎉 Database seeded successfully with authentic Egyptian content!');
     console.log('\n📋 Test Credentials:');

@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Package, Repeat, Users, BarChart3, RefreshCw,
   CheckCircle, Clock, Truck, XCircle, ChefHat, Boxes,
-  Plus, Pencil, Trash2, X, Upload, Search, Image as ImageIcon,
+  Plus, Pencil, Trash2, X, Upload, Search, Image as ImageIcon, Tag,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
@@ -1169,6 +1169,171 @@ function AdminBoxes() {
   );
 }
 
+// ── AdminPromos ────────────────────────────────────────────────────
+function AdminPromos() {
+  const [promos, setPromos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ code: '', discount: '', label: '', usageLimit: '', expiresAt: '' });
+
+  const fetchPromos = () => {
+    api.get('/promo')
+      .then(({ data }) => setPromos(data.promos || []))
+      .catch(() => toast.error('Failed to load promo codes'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchPromos(); }, []);
+
+  const openCreate = () => {
+    setForm({ code: '', discount: '', label: '', usageLimit: '', expiresAt: '' });
+    setDrawerOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.code || !form.discount || !form.label) {
+      toast.error('Code, discount, and label are required'); return;
+    }
+    setSaving(true);
+    try {
+      await api.post('/promo', {
+        code: form.code,
+        discount: parseFloat(form.discount) / 100, // UI uses %, API uses fraction
+        label: form.label,
+        usageLimit: form.usageLimit ? parseInt(form.usageLimit) : null,
+        expiresAt: form.expiresAt || null,
+      });
+      toast.success('Promo code created');
+      setDrawerOpen(false);
+      fetchPromos();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create promo code');
+    } finally { setSaving(false); }
+  };
+
+  const handleToggle = async (id) => {
+    try {
+      const { data } = await api.patch(`/promo/${id}/toggle`);
+      setPromos(prev => prev.map(p => p._id === id ? data.promo : p));
+      toast.success(data.message);
+    } catch { toast.error('Failed to toggle promo'); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this promo code permanently?')) return;
+    try {
+      await api.delete(`/promo/${id}`);
+      setPromos(prev => prev.filter(p => p._id !== id));
+      toast.success('Promo code deleted');
+    } catch { toast.error('Failed to delete promo'); }
+  };
+
+  if (loading) return <div className="animate-pulse h-60 bg-gray-100 rounded-2xl" />;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display text-xl font-bold">Promo Codes ({promos.length})</h2>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2 text-sm">
+          <Plus className="w-4 h-4" /> New Promo
+        </button>
+      </div>
+
+      {promos.length === 0 && <p className="text-gray-400 text-center py-10">No promo codes yet</p>}
+
+      <div className="space-y-3">
+        {promos.map(promo => (
+          <div key={promo._id} className="card p-4 flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              promo.isActive ? 'bg-green-100' : 'bg-gray-100'
+            }`}>
+              <Tag className={`w-5 h-5 ${promo.isActive ? 'text-green-600' : 'text-gray-400'}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-gray-900">{promo.code}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  promo.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {promo.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="text-sm text-gray-500 mt-0.5">
+                {promo.label} · {(promo.discount * 100).toFixed(0)}% off ·
+                Used {promo.usageCount}{promo.usageLimit ? `/${promo.usageLimit}` : ''} times
+                {promo.expiresAt && ` · Expires ${new Date(promo.expiresAt).toLocaleDateString()}`}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => handleToggle(promo._id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  promo.isActive
+                    ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                    : 'bg-green-50 text-green-700 hover:bg-green-100'
+                }`}
+              >
+                {promo.isActive ? 'Deactivate' : 'Activate'}
+              </button>
+              <button onClick={() => handleDelete(promo._id)} className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                <Trash2 className="w-4 h-4 text-red-400" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <SlideOver open={drawerOpen} onClose={() => setDrawerOpen(false)} title="New Promo Code" onSave={handleSave} saving={saving}>
+        <FormField label="Code">
+          <input
+            value={form.code}
+            onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+            placeholder="e.g. SAVE10"
+            className="input-field font-mono"
+          />
+        </FormField>
+        <FormField label="Discount (%)">
+          <input
+            type="number"
+            min="1" max="100"
+            value={form.discount}
+            onChange={e => setForm(p => ({ ...p, discount: e.target.value }))}
+            placeholder="e.g. 10"
+            className="input-field"
+          />
+        </FormField>
+        <FormField label="Label">
+          <input
+            value={form.label}
+            onChange={e => setForm(p => ({ ...p, label: e.target.value }))}
+            placeholder="e.g. 10% off"
+            className="input-field"
+          />
+        </FormField>
+        <FormField label="Usage Limit (optional)">
+          <input
+            type="number"
+            min="1"
+            value={form.usageLimit}
+            onChange={e => setForm(p => ({ ...p, usageLimit: e.target.value }))}
+            placeholder="Leave empty for unlimited"
+            className="input-field"
+          />
+        </FormField>
+        <FormField label="Expiry Date (optional)">
+          <input
+            type="date"
+            value={form.expiresAt}
+            onChange={e => setForm(p => ({ ...p, expiresAt: e.target.value }))}
+            className="input-field"
+          />
+        </FormField>
+      </SlideOver>
+    </div>
+  );
+}
+
 // ── Admin nav ──────────────────────────────────────────────────────
 const adminNav = [
   { to: '/admin',               label: 'Dashboard',     icon: LayoutDashboard, end: true },
@@ -1177,6 +1342,7 @@ const adminNav = [
   { to: '/admin/users',         label: 'Users',         icon: Users },
   { to: '/admin/meals',         label: 'Meals',         icon: ChefHat },
   { to: '/admin/boxes',         label: 'Boxes',         icon: Boxes },
+  { to: '/admin/promos',        label: 'Promos',        icon: Tag },
   { to: '/admin/inventory',     label: 'Inventory',     icon: RefreshCw },
 ];
 
@@ -1220,6 +1386,7 @@ export default function AdminLayout() {
           <Route path="users"         element={<AdminUsers />} />
           <Route path="meals"         element={<AdminMeals />} />
           <Route path="boxes"         element={<AdminBoxes />} />
+          <Route path="promos"        element={<AdminPromos />} />
           <Route path="inventory"     element={<AdminInventory />} />
         </Routes>
       </div>

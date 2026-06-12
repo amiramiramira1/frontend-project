@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { User, Package, Repeat, Settings, LogOut } from 'lucide-react';
+import { User, Package, Repeat, Settings, LogOut, Heart } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function DashboardLayout() {
@@ -15,6 +15,7 @@ export default function DashboardLayout() {
     { to: '/dashboard',                label: t('dash.profile'),       icon: User,     end: true },
     { to: '/dashboard/orders',         label: t('dash.myOrders'),      icon: Package },
     { to: '/dashboard/subscriptions',  label: t('dash.subscriptions'), icon: Repeat },
+    { to: '/dashboard/favorites',      label: t('dash.favorites', 'Favorites'), icon: Heart },
     { to: '/dashboard/settings',       label: t('dash.settings'),      icon: Settings },
   ];
 

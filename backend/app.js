@@ -20,6 +20,8 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const cartRoutes         = require('./routes/cartRoutes');
 const adminRoutes        = require('./routes/adminRoutes');
 const uploadRoutes       = require('./routes/uploadRoutes');
+const promoRoutes        = require('./routes/promoRoutes');
+const favoritesRoutes    = require('./routes/favoritesRoutes');
 const chatbotRoute       = require('./chatbot');
 
 // --- Create Express App ---
@@ -40,6 +42,8 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/cart',          cartRoutes);
 app.use('/api/admin',         adminRoutes);
 app.use('/api/upload',        uploadRoutes);
+app.use('/api/promo',         promoRoutes);
+app.use('/api/favorites',     favoritesRoutes);
 app.use('/api/chatbot',       chatbotRoute);
 
 // --- Health Check Route ---
