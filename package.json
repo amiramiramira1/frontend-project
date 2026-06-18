@@ -6,7 +6,8 @@
   "scripts": {
     "frontend": "cd frontend && npm run dev",
     "backend": "cd backend && npm run dev",
-    "dev": "concurrently \"npm run frontend\" \"npm run backend\"",
+    "ai-service": "cd ai-service && python -m uvicorn main:app --port 8000 --reload",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\" \"npm run ai-service\"",
     "install:all": "cd frontend && npm install && cd ../backend && npm install",
     "build": "cd frontend && npm run build"
   },
