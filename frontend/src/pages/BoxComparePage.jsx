@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { ChevronLeft, Check, X, Users, ChefHat, Flame, Tag, ShoppingCart, AlertTriangle, Trophy } from 'lucide-react';
@@ -15,6 +16,8 @@ export default function BoxComparePage() {
   const { addToCart } = useCart();
   const { user } = useAuth();
 
+  const { t, i18n } = useTranslation();
+
   const [boxes, setBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +32,7 @@ export default function BoxComparePage() {
       .then(responses => setBoxes(responses.map(r => r.data.box).filter(Boolean)))
       .catch(() => toast.error('Failed to load boxes for comparison'))
       .finally(() => setLoading(false));
-  }, [searchParams.get('ids')]);
+  }, [searchParams.get('ids'), i18n.language]);
 
   const handleAddToCart = async (box) => {
     if (!user) { navigate('/login'); return; }

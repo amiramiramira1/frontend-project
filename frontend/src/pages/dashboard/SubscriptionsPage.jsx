@@ -18,7 +18,7 @@ const statusColors = {
 
 export default function SubscriptionsPage() {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [subs, setSubs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export default function SubscriptionsPage() {
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
     fetchSubs();
-  }, [user]);
+  }, [user, i18n.language]);
 
   const handleTogglePause = async (id, currentStatus) => {
     try {

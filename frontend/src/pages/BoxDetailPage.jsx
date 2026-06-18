@@ -40,7 +40,7 @@ export default function BoxDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [box, setBox] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,7 +71,7 @@ export default function BoxDetailPage() {
       }
     };
     fetchBox();
-  }, [id]);
+  }, [id, i18n.language]);
 
   // ── Computed pricing from backend basePrice + serving multiplier ──
   // The backend calculates basePrice as sum of all meals' pricePerServing.

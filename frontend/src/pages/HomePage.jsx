@@ -9,7 +9,7 @@ import { HOME_STATS } from '../constants/homeStats';
 
 export default function HomePage() {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [featuredBoxes, setFeaturedBoxes] = useState([]);
   const [recommendedBoxes, setRecommendedBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,7 @@ export default function HomePage() {
     api.get('/boxes', { params: { limit: 3 } })
       .then(({ data }) => setFeaturedBoxes(data.boxes || []))
       .finally(() => setLoading(false));
-  }, []);
+  }, [i18n.language]);
 
   // Fetch personalized recommendations when user is logged in
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function HomePage() {
         .catch(() => {})
         .finally(() => setLoadingRecommended(false));
     }
-  }, [user]);
+  }, [user, i18n.language]);
 
   const features = [
     { icon: Clock,  title: t('home.feat1Title'), desc: t('home.feat1Desc') },

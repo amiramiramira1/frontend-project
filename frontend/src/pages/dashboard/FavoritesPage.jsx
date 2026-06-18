@@ -6,7 +6,7 @@ import { Heart, ArrowRight, Package } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function FavoritesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toggleFavorite, isFavorite } = useFavorites();
   const [boxes, setBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ export default function FavoritesPage() {
       .then(({ data }) => setBoxes(data.favorites || []))
       .catch(() => setBoxes([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [i18n.language]);
 
   const handleToggle = async (boxId) => {
     await toggleFavorite(boxId);

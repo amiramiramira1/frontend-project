@@ -19,7 +19,7 @@ const dietTagColors = {
 export default function MealDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [meal, setMeal] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +39,7 @@ export default function MealDetailPage() {
       }
     };
     fetchMeal();
-  }, [id, navigate, t]);
+  }, [id, navigate, t, i18n.language]);
 
   if (loading) {
     return (

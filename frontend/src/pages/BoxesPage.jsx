@@ -7,7 +7,7 @@ import { Search, X, GitCompareArrows } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function BoxesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const dietFilters = [
     { value: 'all',         label: t('boxes.dietAll') },
@@ -44,7 +44,7 @@ export default function BoxesPage() {
       }
     };
     fetchBoxes();
-  }, [selectedDiet]);
+  }, [selectedDiet, i18n.language]);
 
   const filteredBoxes = boxes.filter(box => {
     if (!search) return true;

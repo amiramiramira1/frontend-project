@@ -25,7 +25,7 @@ export default function BuildBoxPage() {
   const { user } = useAuth();
   const { addToCart } = useCart();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export default function BuildBoxPage() {
       .then(({ data }) => setMeals(data.meals || []))
       .catch(() => toast.error(t('msg.loadMealsFailed')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [i18n.language]);
 
   // POST /api/boxes/custom/calculate whenever selection or servings changes
   useEffect(() => {
