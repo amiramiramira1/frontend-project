@@ -73,7 +73,7 @@ export default function SettingsPage() {
                   : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
               }`}
             >
-              {lang === 'en' ? `🇬🇧 ${t('settings.langEn')}` : `🇸🇦 ${t('settings.langAr')}`}
+              {lang === 'en' ? t('settings.langEn') : t('settings.langAr')}
             </button>
           ))}
         </div>
@@ -99,7 +99,7 @@ export default function SettingsPage() {
                   : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
               }`}
             >
-              {n} {n === 1 ? 'person' : 'people'}
+              {t(n === 1 ? 'boxDetails.person1' : `boxDetails.people${n}`)}
             </button>
           ))}
         </div>

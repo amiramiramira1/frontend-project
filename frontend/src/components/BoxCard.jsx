@@ -1,19 +1,21 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
-// Maps backend dietType values to display labels and colors
+// Maps backend dietType values to display colors and emojis
 const dietStyles = {
-  'vegetarian': { color: 'bg-green-100 text-green-700', label: '🌱 Vegetarian' },
-  'vegan':      { color: 'bg-emerald-100 text-emerald-700', label: '🌿 Vegan' },
-  'keto':       { color: 'bg-purple-100 text-purple-700', label: '⚡ Keto' },
-  'paleo':      { color: 'bg-amber-100 text-amber-700', label: '🥩 Paleo' },
-  'standard':   { color: 'bg-blue-100 text-blue-700', label: '🍽️ Standard' },
-  'mixed':      { color: 'bg-gray-100 text-gray-700', label: '🔀 Mixed' },
+  'vegetarian': { color: 'bg-green-100 text-green-700', emoji: '🌱' },
+  'vegan':      { color: 'bg-emerald-100 text-emerald-700', emoji: '🌿' },
+  'keto':       { color: 'bg-purple-100 text-purple-700', emoji: '⚡' },
+  'paleo':      { color: 'bg-amber-100 text-amber-700', emoji: '🥩' },
+  'standard':   { color: 'bg-blue-100 text-blue-700', emoji: '🍽️' },
+  'mixed':      { color: 'bg-gray-100 text-gray-700', emoji: '🔀' },
 };
 
 // Serving size price multipliers — same as backend
 const MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
 
 export default function BoxCard({ box }) {
+  const { t } = useTranslation();
   const style = dietStyles[box.dietType];
   // Show starting price for 2 servings (most popular)
   const displayPrice = box.basePrice ? (box.basePrice * MULTIPLIERS[2]).toFixed(0) : null;
@@ -32,7 +34,7 @@ export default function BoxCard({ box }) {
           {/* Diet type badge (top right) */}
           {style && (
             <div className="absolute top-3 right-3">
-              <span className={`badge ${style.color}`}>{style.label}</span>
+              <span className={`badge ${style.color}`}>{style.emoji} {t(`boxes.diet${box.dietType.charAt(0).toUpperCase() + box.dietType.slice(1)}`, box.dietType)}</span>
             </div>
           )}
         </div>
@@ -43,9 +45,9 @@ export default function BoxCard({ box }) {
           <p className="text-sm text-gray-500 mb-3 line-clamp-2">{box.description}</p>
 
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">{mealsCount} meal{mealsCount !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-gray-400">{mealsCount} {mealsCount === 1 ? t('boxDetails.meal', 'meal') : t('boxDetails.meals', 'meals')}</span>
             {displayPrice && (
-              <span className="text-sm font-bold text-brand-600">from {displayPrice} EGP</span>
+              <span className="text-sm font-bold text-brand-600">{t('boxDetails.from', 'from')} {displayPrice} {t('boxDetails.egp', 'EGP')}</span>
             )}
           </div>
         </div>

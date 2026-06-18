@@ -123,10 +123,10 @@ export default function ProfilePage() {
       <div className="card p-6">
         <h3 className="font-display font-bold text-lg mb-2 flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 text-red-400" />
-          {t('profile.foodAllergens', { defaultValue: 'Food Allergens' })}
+          {t('profile.foodAllergens', 'Food Allergens')}
         </h3>
         <p className="text-sm text-gray-500 mb-4">
-          {t('profile.allergensDesc', { defaultValue: 'Select any allergens so we can filter unsafe meals and boxes for you.' })}
+          {t('profile.allergensDesc', 'Select any allergens so we can filter unsafe meals and boxes for you.')}
         </p>
         <div className="flex flex-wrap gap-2">
           {ALLERGEN_OPTIONS.map(opt => (
@@ -140,7 +140,7 @@ export default function ProfilePage() {
                   : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
               }`}
             >
-              {t(`allergen.${opt.value}`, { defaultValue: opt.label })}
+              {opt.emoji} {t(`allergens.${opt.value}`, opt.label.replace(opt.emoji, '').trim())}
             </button>
           ))}
         </div>

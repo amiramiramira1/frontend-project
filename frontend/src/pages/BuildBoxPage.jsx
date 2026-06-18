@@ -40,6 +40,12 @@ export default function BuildBoxPage() {
   const [savedBoxes, setSavedBoxes] = useState(loadSavedBoxes);
   const [saving, setSaving] = useState(false);
 
+  // Sync default box name on language change
+  useEffect(() => {
+    if (!boxName || boxName === 'Your Custom Box' || boxName === 'صندوقك المخصص' || boxName === 'My Custom Box') {
+      setBoxName(t('buildBox.yourCustomBox'));
+    }
+  }, [i18n.language, t]);
 
   useEffect(() => { localStorage.setItem('preferred_diet', dietFilter); }, [dietFilter]);
 
@@ -206,7 +212,11 @@ export default function BuildBoxPage() {
                       <div className="w-8 h-8 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Bookmark className="w-4 h-4 text-brand-500" />
                       </div>
-                      <p className="font-semibold text-gray-900 text-sm leading-tight pr-6 truncate">{box.name}</p>
+                      <p className="font-semibold text-gray-900 text-sm leading-tight pr-6 truncate">
+                        {box.name === 'My Custom Box' || box.name === 'Your Custom Box' || box.name === 'صندوقك المخصص'
+                          ? t('buildBox.yourCustomBox')
+                          : box.name}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-400">
                       <span>{mc} {mc !== 1 ? t('buildBox.meals') : t('buildBox.meal')}</span>
@@ -232,7 +242,7 @@ export default function BuildBoxPage() {
                 {dietFilters.map(f => (
                   <button key={f} onClick={() => setDietFilter(f)}
                     className={`px-3 py-2 rounded-full text-sm font-medium transition-all capitalize ${dietFilter === f ? 'bg-brand-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-brand-300'}`}>
-                    {t(`dietType.${f.toLowerCase()}`, { defaultValue: f })}
+                    {t(`boxes.diet${f.charAt(0).toUpperCase() + f.slice(1)}`, f)}
                   </button>
                 ))}
               </div>
@@ -258,7 +268,7 @@ export default function BuildBoxPage() {
                         <img src={meal.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400'} alt={meal.name} className="w-full h-36 object-cover" />
                         {isOutOfStock && (
                           <div className="absolute top-2 left-2">
-                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md uppercase tracking-wider">Out of Stock</span>
+                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md uppercase tracking-wider">{t('mealDetails.outOfStock', 'Out of Stock')}</span>
                           </div>
                         )}
                         {isAdded && (
@@ -279,13 +289,13 @@ export default function BuildBoxPage() {
                         </div>
                         <div className="flex gap-3 mb-3 text-xs text-gray-500">
                           <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" /> {meal.caloriesPerServing} {t('buildBox.cal')}</span>
-                          <span className="font-medium text-brand-600">{(meal.pricePerServing * servings).toFixed(0)} EGP</span>
+                          <span className="font-medium text-brand-600">{(meal.pricePerServing * servings).toFixed(0)} {t('boxDetails.egp', 'EGP')}</span>
                           <span className="capitalize text-gray-400">{t(`cuisine.${meal.cuisine?.toLowerCase()}`, { defaultValue: meal.cuisine })}</span>
                         </div>
                         {isOutOfStock ? (
                           <button disabled
                             className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200">
-                            Out of Stock
+                            {t('mealDetails.outOfStock', 'Out of Stock')}
                           </button>
                         ) : !isAdded ? (
                           <button onClick={() => addMeal(meal._id)} disabled={boxFull}
@@ -336,7 +346,7 @@ export default function BuildBoxPage() {
                           </div>
                           <div className="flex gap-3 mt-1 mb-2 text-xs text-gray-500">
                             <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />{meal.caloriesPerServing} {t('buildBox.cal')}</span>
-                            <span className="font-medium text-brand-600">{(meal.pricePerServing * servings).toFixed(0)} EGP</span>
+                            <span className="font-medium text-brand-600">{(meal.pricePerServing * servings).toFixed(0)} {t('boxDetails.egp', 'EGP')}</span>
                           </div>
                           {!isAdded ? (
                             <button onClick={() => addMeal(meal._id)} className="w-full py-1.5 rounded-xl text-xs font-medium bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-500 hover:text-white transition-all">+ {t('buildBox.add')}</button>
@@ -415,7 +425,7 @@ export default function BuildBoxPage() {
                 <div className="flex justify-between items-center mb-4 pt-2 border-t border-gray-100">
                   <span className="text-sm font-semibold text-gray-700">{t('buildBox.total')}</span>
                   <span className="font-display font-black text-xl text-brand-600">
-                    {calculating ? '…' : `${priceInfo.totalPrice?.toLocaleString()} EGP`}
+                    {calculating ? '…' : `${priceInfo.totalPrice?.toLocaleString()} ${t('boxDetails.egp', 'EGP')}`}
                   </span>
                 </div>
               )}

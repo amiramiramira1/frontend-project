@@ -73,8 +73,8 @@ export default function BoxesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Helmet>
-        <title>All Meal Boxes — Boxify</title>
-        <meta name="description" content="Browse all our curated meal boxes. Fresh ingredients delivered weekly across Egypt." />
+        <title>{t('boxes.pageTitle')} — Boxify</title>
+        <meta name="description" content={t('boxes.pageSubtitle')} />
       </Helmet>
 
       {/* Header */}

@@ -31,7 +31,9 @@ export default function DashboardLayout() {
                 </div>
                 <h2 className="font-display font-bold text-gray-900">{user.name}</h2>
                 <p className="text-sm text-gray-500">{user.email}</p>
-                <span className={`badge mt-2 ${user.role === 'admin' ? 'badge-blue' : 'badge-gray'}`}>{user.role}</span>
+                <span className={`badge mt-2 ${user.role === 'admin' ? 'badge-blue' : 'badge-gray'}`}>
+                  {t(`nav.${user.role}`, user.role)}
+                </span>
               </div>
             </div>
             <nav className="card overflow-hidden">

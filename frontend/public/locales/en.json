@@ -9,7 +9,8 @@
     "myOrders":      "My Orders",
     "subscriptions": "Subscriptions",
     "adminPanel":    "Admin Panel",
-    "logout":        "Logout"
+    "logout":        "Logout",
+    "user":          "User"
   },
 
   "home": {
@@ -434,7 +435,10 @@
     "typeToConfirm": "Type DELETE to confirm:",
     "typePh":        "Type DELETE",
     "cancel":        "Cancel",
-    "deletePerm":    "Delete Permanently"
+    "deletePerm":    "Delete Permanently",
+    "foodAllergens": "Food Allergens",
+    "allergensDesc": "Select any allergens so we can filter unsafe meals and boxes for you.",
+    "allergensSelected": "{{count}} allergens selected — meals with these ingredients will be flagged."
   },
 
   "settings": {
@@ -465,6 +469,7 @@
   "buildBox": {
     "title": "Build Your Box",
     "subtitle": "Pick any meals you love. We'll portion everything fresh.",
+    "assistantHint": "Need help choosing? Ask our assistant 🥕 in the chat!",
     "savedBoxes": "Your Saved Boxes",
     "meal": "meal",
     "meals": "meals",
@@ -511,7 +516,8 @@
     "gluten": "gluten",
     "dairy": "dairy",
     "soy": "soy",
-    "eggs": "eggs"
+    "eggs": "eggs",
+    "shellfish": "shellfish"
   },
   "cuisine": {
     "egyptian": "Egyptian",
@@ -528,6 +534,7 @@
     "people4": "4 People",
     "people6": "6 People",
     "meals": "meals",
+    "meal": "meal",
     "person": "person",
     "people": "people",
     "egpMeal": "EGP/meal",
@@ -566,6 +573,7 @@
     "adding": "Adding...",
     "subscribe": "Subscribe",
     "egp": "EGP",
+    "from": "from",
     "servesRange": "Serves 1-6",
     "compareTitle": "Compare Boxes",
     "compareSubtitle": "Side-by-side comparison to help you decide",
