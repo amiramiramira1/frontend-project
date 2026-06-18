@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Package, Repeat, Users, BarChart3, RefreshCw,
   CheckCircle, Clock, Truck, XCircle, ChefHat, Boxes,
-  Plus, Pencil, Trash2, X, Upload, Search, Image as ImageIcon, Tag,
+  Plus, Pencil, Trash2, X, Upload, Search, Image as ImageIcon, Tag, Leaf,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
@@ -1334,6 +1334,243 @@ function AdminPromos() {
   );
 }
 
+// ── AdminIngredients — full CRUD ───────────────────────────────────
+const UNIT_OPTIONS = ['g', 'kg', 'ml', 'L', 'piece', 'tbsp', 'tsp'];
+const EMPTY_INGREDIENT_FORM = {
+  name: '', unit: 'g', costPerUnit: '', caloriesPerUnit: '',
+  stockQuantity: '', inStock: true,
+};
+
+function AdminIngredients() {
+  const [ingredients, setIngredients]     = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [drawerOpen, setDrawerOpen]       = useState(false);
+  const [editing, setEditing]             = useState(null);
+  const [form, setForm]                   = useState(EMPTY_INGREDIENT_FORM);
+  const [saving, setSaving]               = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [search, setSearch]               = useState('');
+
+  const fetchIngredients = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/ingredients', { params: { limit: 200 } });
+      setIngredients(data.ingredients || []);
+    } catch {
+      toast.error('Failed to load ingredients');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchIngredients(); }, [fetchIngredients]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY_INGREDIENT_FORM);
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (ing) => {
+    setEditing(ing);
+    setForm({
+      name:           ing.name || '',
+      unit:           ing.unit || 'g',
+      costPerUnit:    ing.costPerUnit ?? '',
+      caloriesPerUnit: ing.caloriesPerUnit ?? '',
+      stockQuantity:  ing.stockQuantity ?? '',
+      inStock:        ing.inStock !== false,
+    });
+    setDrawerOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    if (!form.unit) { toast.error('Unit is required'); return; }
+    if (!form.costPerUnit && form.costPerUnit !== 0) { toast.error('Cost per unit is required'); return; }
+    if (!form.caloriesPerUnit && form.caloriesPerUnit !== 0) { toast.error('Calories per unit is required'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        name:           form.name.trim(),
+        unit:           form.unit,
+        costPerUnit:    Number(form.costPerUnit),
+        caloriesPerUnit: Number(form.caloriesPerUnit),
+        stockQuantity:  form.stockQuantity !== '' ? Number(form.stockQuantity) : 0,
+        inStock:        form.inStock,
+      };
+      if (editing) {
+        const { data } = await api.put(`/ingredients/${editing._id}`, payload);
+        setIngredients(prev => prev.map(i => i._id === editing._id ? data.ingredient : i));
+        toast.success('Ingredient updated');
+      } else {
+        const { data } = await api.post('/ingredients', payload);
+        setIngredients(prev => [data.ingredient, ...prev]);
+        toast.success('Ingredient created');
+      }
+      setDrawerOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/ingredients/${id}`);
+      setIngredients(prev => prev.filter(i => i._id !== id));
+      setConfirmDelete(null);
+      toast.success('Ingredient deleted');
+    } catch { toast.error('Delete failed'); }
+  };
+
+  const filteredIngredients = ingredients.filter(i =>
+    i.name.toLowerCase().includes(search.toLowerCase()) ||
+    i.unit?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) return <div className="animate-pulse h-60 bg-gray-100 rounded-2xl" />;
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <h2 className="font-display text-xl font-bold text-gray-900">Ingredients ({ingredients.length})</h2>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2 !py-2 !px-4">
+          <Plus className="w-4 h-4" /> New Ingredient
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search ingredients…"
+          className="input-field !pl-9"
+        />
+      </div>
+
+      {filteredIngredients.length === 0 && <p className="text-gray-400 text-center py-10">No ingredients found</p>}
+
+      {/* Ingredient cards */}
+      <div className="space-y-3">
+        {filteredIngredients.map(ing => (
+          <div key={ing._id} className="card p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Avatar */}
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-green-700 font-bold text-lg">{ing.name?.[0]?.toUpperCase()}</span>
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-gray-900">{ing.name}</span>
+                  <span className={`badge ${ing.inStock ? 'badge-green' : 'badge-red'}`}>
+                    {ing.inStock ? 'In Stock' : 'Out of Stock'}
+                  </span>
+                  <span className="badge badge-gray">{ing.unit}</span>
+                </div>
+                <div className="text-sm text-gray-500 mt-0.5">
+                  {ing.costPerUnit} EGP/{ing.unit} · {ing.caloriesPerUnit} cal/{ing.unit}
+                  {ing.stockQuantity > 0 && <> · <span className="font-medium text-brand-600">{ing.stockQuantity} {ing.unit}</span> in stock</>}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {confirmDelete === ing._id ? (
+                  <>
+                    <span className="text-sm text-gray-600">Delete?</span>
+                    <button onClick={() => handleDelete(ing._id)} className="px-3 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors">Yes</button>
+                    <button onClick={() => setConfirmDelete(null)} className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors">No</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => openEdit(ing)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-brand-600">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setConfirmDelete(ing._id)} className="p-2 hover:bg-red-50 rounded-xl transition-colors text-gray-500 hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Slide-over form */}
+      <SlideOver
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={editing ? `Edit: ${editing.name}` : 'New Ingredient'}
+        onSave={handleSave}
+        saving={saving}
+      >
+        {/* Name */}
+        <FormField label="Name *">
+          <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input-field" placeholder="e.g. Chicken Breast" />
+        </FormField>
+
+        {/* Unit */}
+        <FormField label="Unit *">
+          <select value={form.unit} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} className="input-field">
+            {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </FormField>
+
+        {/* Cost per Unit */}
+        <FormField label="Cost per Unit (EGP) *">
+          <input
+            type="number" min="0.01" step="0.01"
+            value={form.costPerUnit}
+            onChange={e => setForm(p => ({ ...p, costPerUnit: e.target.value }))}
+            className="input-field" placeholder="e.g. 0.25"
+          />
+        </FormField>
+
+        {/* Calories per Unit */}
+        <FormField label="Calories per Unit *">
+          <input
+            type="number" min="0" step="0.1"
+            value={form.caloriesPerUnit}
+            onChange={e => setForm(p => ({ ...p, caloriesPerUnit: e.target.value }))}
+            className="input-field" placeholder="e.g. 1.65"
+          />
+        </FormField>
+
+        {/* Stock Quantity */}
+        <FormField label="Stock Quantity">
+          <input
+            type="number" min="0"
+            value={form.stockQuantity}
+            onChange={e => setForm(p => ({ ...p, stockQuantity: e.target.value }))}
+            className="input-field" placeholder="e.g. 500"
+          />
+        </FormField>
+
+        {/* In Stock toggle */}
+        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+          <div>
+            <div className="font-semibold text-gray-900 text-sm">In Stock</div>
+            <div className="text-xs text-gray-500">Mark this ingredient as available</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm(p => ({ ...p, inStock: !p.inStock }))}
+            className={`relative w-12 h-6 rounded-full transition-colors ${form.inStock ? 'bg-brand-500' : 'bg-gray-300'}`}
+          >
+            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.inStock ? 'translate-x-7' : 'translate-x-1'}`} />
+          </button>
+        </div>
+      </SlideOver>
+    </div>
+  );
+}
+
 // ── Admin nav ──────────────────────────────────────────────────────
 const adminNav = [
   { to: '/admin',               label: 'Dashboard',     icon: LayoutDashboard, end: true },
@@ -1343,6 +1580,7 @@ const adminNav = [
   { to: '/admin/meals',         label: 'Meals',         icon: ChefHat },
   { to: '/admin/boxes',         label: 'Boxes',         icon: Boxes },
   { to: '/admin/promos',        label: 'Promos',        icon: Tag },
+  { to: '/admin/ingredients',   label: 'Ingredients',   icon: Leaf },
   { to: '/admin/inventory',     label: 'Inventory',     icon: RefreshCw },
 ];
 
@@ -1387,6 +1625,7 @@ export default function AdminLayout() {
           <Route path="meals"         element={<AdminMeals />} />
           <Route path="boxes"         element={<AdminBoxes />} />
           <Route path="promos"        element={<AdminPromos />} />
+          <Route path="ingredients"   element={<AdminIngredients />} />
           <Route path="inventory"     element={<AdminInventory />} />
         </Routes>
       </div>
