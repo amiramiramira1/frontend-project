@@ -35,9 +35,10 @@ export default function CheckoutPage() {
   const [promoError, setPromoError] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
 
+  const cartTotal = cart?.cartTotal || 0;
   const discountedTotal = appliedPromo
-    ? cart.cartTotal - cart.cartTotal * appliedPromo.discount
-    : cart.cartTotal;
+    ? cartTotal - cartTotal * appliedPromo.discount
+    : cartTotal;
 
   const handleApplyPromo = async () => {
     const code = promoCode.trim().toUpperCase();
@@ -92,7 +93,7 @@ export default function CheckoutPage() {
           order: {
             ...data.order,
             appliedPromo: appliedPromo || null,
-            originalPrice: cart.cartTotal,
+            originalPrice: cart?.cartTotal || 0,
             discountedTotal,
             timeSlot: form.timeSlot,
             phone: form.phone,
@@ -106,7 +107,7 @@ export default function CheckoutPage() {
     }
   };
 
-  if (!cart.items?.length && !orderPlaced.current) {
+  if (!cart?.items?.length && !orderPlaced.current) {
     navigate('/cart'); return null;
   }
 
@@ -228,7 +229,7 @@ export default function CheckoutPage() {
               <div className="card p-6 sticky top-24">
                 <h2 className="font-display text-xl font-bold mb-4">{t('checkout.summary')}</h2>
                 <div className="space-y-2 text-sm text-gray-600 mb-4">
-                    {cart.items.map(item => (
+                    {cart?.items?.map(item => (
                       <div key={item._id} className="flex justify-between">
                         <span className="truncate pr-2">{item.box?.name || 'Meal Box'} ×{item.quantity || 1}</span>
                         <span className="font-medium text-gray-900">
@@ -257,7 +258,7 @@ export default function CheckoutPage() {
                     <span className="font-bold text-gray-800">{t('checkout.total')}</span>
                     <div className="text-right">
                         {appliedPromo && (
-                          <div className="text-sm text-gray-400 line-through">{cart.cartTotal?.toLocaleString()} EGP</div>
+                          <div className="text-sm text-gray-400 line-through">{cart?.cartTotal?.toLocaleString()} EGP</div>
                         )}
                         <div className="text-2xl font-display font-black text-brand-600">{discountedTotal?.toLocaleString()} EGP</div>
                     </div>

@@ -27,7 +27,7 @@ export default function CartPage() {
     );
   }
 
-  const isEmpty = !cart.items || cart.items.length === 0;
+  const isEmpty = !cart?.items || cart?.items?.length === 0;
 
   const handleQuantityChange = async (item, delta) => {
     const newQty = (item.quantity || 1) + delta;
@@ -69,7 +69,7 @@ export default function CartPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-4">
-              {cart.items.map((item) => {
+              {cart?.items?.map((item) => {
                 const box = item.box || {};
                 const servingLabel = item.servingSize === 1
                   ? `1 ${t('cart.person')}`
@@ -118,7 +118,7 @@ export default function CartPage() {
               <div className="card p-6 sticky top-24">
                 <h2 className="font-display text-xl font-bold mb-4">{t('cart.summary')}</h2>
                 <div className="space-y-2 text-sm text-gray-600 mb-4">
-                  {cart.items.map(item => (
+                  {cart?.items?.map(item => (
                     <div key={item._id} className="flex justify-between">
                       <span className="truncate pr-2">{item.box?.name || 'Box'} ×{item.quantity || 1}</span>
                       <span className="font-medium text-gray-900">{itemTotal(item)} EGP</span>
@@ -129,7 +129,7 @@ export default function CartPage() {
                   <div className="flex justify-between items-end">
                     <span className="font-semibold text-gray-700">{t('cart.total')}</span>
                     <div className="text-right">
-                      <span className="text-2xl font-display font-black text-brand-600">{cart.cartTotal?.toLocaleString()} EGP</span>
+                      <span className="text-2xl font-display font-black text-brand-600">{cart?.cartTotal?.toLocaleString()} EGP</span>
                       <div className="text-xs text-gray-400">{t('cart.cod')}</div>
                     </div>
                   </div>
