@@ -87,7 +87,13 @@ const getBoxes = async (req, res) => {
       filter.isActive = true;
     }
     if (req.query.dietType) filter.dietType = req.query.dietType;
-    if (req.query.type) filter.type = req.query.type;
+    
+    // Default to only listing pre-made boxes to avoid leaking custom boxes into public lists
+    const type = req.query.type || 'pre-made';
+    if (type !== 'all') {
+      filter.type = type;
+    }
+    
     if (req.query.maxPrice) filter.basePrice = { $lte: Number(req.query.maxPrice) };
 
     const servingSize = parseInt(req.query.servingSize) || 2;
@@ -334,8 +340,8 @@ const getRecommendedBoxes = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 6;
 
-    // Fetch all active boxes with their meals populated (need allergens data)
-    const boxes = await Box.find({ isActive: true })
+    // Fetch all active, standard pre-made boxes with their meals populated (need allergens data)
+    const boxes = await Box.find({ isActive: true, type: 'pre-made' })
       .populate({ path: 'meals', select: 'name allergens dietType pricePerServing caloriesPerServing' });
 
     if (boxes.length === 0) {

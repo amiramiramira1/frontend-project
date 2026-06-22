@@ -18,9 +18,9 @@ from typing import Optional
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timedelta
-import os, json, httpx, time, sys, re, difflib
+import os, json, httpx, time, sys, re, difflib, asyncio, random
 
 # Reconfigure stdout/stderr to UTF-8 to prevent UnicodeEncodeError on Windows terminals
 if hasattr(sys.stdout, 'reconfigure'):
@@ -56,17 +56,22 @@ MODEL_ID = "gemini-2.5-flash-lite"
 MONGO_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
 
-try:
-    mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    db = mongo_client["boxify"]
-    mongo_client.admin.command('ping')
-    print("✅ Connected to MongoDB")
+db = None
 
-    # Create TTL index on chat_sessions — auto-delete after 7 days
-    db.chat_sessions.create_index("expiresAt", expireAfterSeconds=0)
-except Exception as e:
-    print(f"❌ MongoDB error: {e}")
-    db = None
+
+@app.on_event("startup")
+async def startup_db():
+    global db
+    try:
+        mongo_client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        await mongo_client.admin.command('ping')
+        db = mongo_client["boxify"]
+        # Create TTL index on chat_sessions — auto-delete after 7 days
+        await db.chat_sessions.create_index("expiresAt", expireAfterSeconds=0)
+        print("✅ Connected to MongoDB")
+    except Exception as e:
+        print(f"❌ MongoDB error: {e}")
+        db = None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FAQ DATASET
@@ -336,10 +341,10 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
                     query_filter = {}
                     if args.get("dietType"):
                         query_filter["dietType"] = args["dietType"].lower().strip()
-                    meals = list(db.meals.find(query_filter, {
+                    meals = await db.meals.find(query_filter, {
                         "_id": 1, "name": 1, "description": 1, "dietType": 1,
                         "pricePerServing": 1, "caloriesPerServing": 1, "allergens": 1
-                    }))
+                    }).to_list(length=200)
                     return {
                         "meals": [
                             {
@@ -423,17 +428,17 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
 # SESSION MANAGEMENT (MongoDB-backed)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_session_history(session_id: str) -> list:
+async def get_session_history(session_id: str) -> list:
     """Retrieve conversation history from MongoDB."""
     if db is None:
         return []
-    session = db.chat_sessions.find_one({"sessionId": session_id})
+    session = await db.chat_sessions.find_one({"sessionId": session_id})
     if not session:
         return []
     return session.get("messages", [])
 
 
-def save_session_message(session_id: str, role: str, content: str, user_id: str = None,
+async def save_session_message(session_id: str, role: str, content: str, user_id: str = None,
                          tool_call: dict = None, tool_result: dict = None):
     """Append a message to the session in MongoDB."""
     if db is None:
@@ -449,7 +454,7 @@ def save_session_message(session_id: str, role: str, content: str, user_id: str 
     if tool_result:
         message["toolResult"] = tool_result
 
-    db.chat_sessions.update_one(
+    await db.chat_sessions.update_one(
         {"sessionId": session_id},
         {
             "$push": {"messages": message},
@@ -520,6 +525,33 @@ class ChatRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 # ─────────────────────────────────────────────────────────────────────────────
+# GEMINI RETRY HELPER
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def gemini_generate_with_retry(contents, config, max_retries=3):
+    """Call Gemini with exponential backoff on rate-limit or transient errors."""
+    for attempt in range(max_retries):
+        try:
+            response = await gemini_client.aio.models.generate_content(
+                model=MODEL_ID,
+                contents=contents,
+                config=config,
+            )
+            return response
+        except Exception as e:
+            error_str = str(e).lower()
+            is_retryable = any(keyword in error_str for keyword in [
+                "429", "resource_exhausted", "rate limit",
+                "503", "unavailable", "500", "internal"
+            ])
+            if is_retryable and attempt < max_retries - 1:
+                wait = (2 ** attempt) + random.uniform(0, 1)
+                print(f"⏳ Gemini retry {attempt + 1}/{max_retries} in {wait:.1f}s: {e}")
+                await asyncio.sleep(wait)
+            else:
+                raise
+
+# ─────────────────────────────────────────────────────────────────────────────
 # MAIN CHAT ENDPOINT
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -538,7 +570,7 @@ async def chat(req: ChatRequest):
         lang = detect_language(req.message)
 
         # Build conversation history from MongoDB
-        history = get_session_history(sid)
+        history = await get_session_history(sid)
 
         # Convert history to Gemini message format
         gemini_history = []
@@ -559,7 +591,7 @@ async def chat(req: ChatRequest):
         )
 
         # Save user message to session
-        save_session_message(sid, "user", req.message)
+        await save_session_message(sid, "user", req.message)
 
         # Add the new user message
         gemini_history.append(types.Content(role="user", parts=[types.Part.from_text(text=req.message)]))
@@ -569,11 +601,7 @@ async def chat(req: ChatRequest):
         tool_calls_made = []
 
         for iteration in range(max_iterations):
-            response = gemini_client.models.generate_content(
-                model=MODEL_ID,
-                contents=gemini_history,
-                config=config,
-            )
+            response = await gemini_generate_with_retry(gemini_history, config)
 
             candidate = response.candidates[0]
             parts = candidate.content.parts
@@ -590,7 +618,7 @@ async def chat(req: ChatRequest):
                     answer = "Sorry, I couldn't process that. Could you rephrase?"
 
                 # Save assistant response
-                save_session_message(sid, "model", answer)
+                await save_session_message(sid, "model", answer)
 
                 return {
                     "answer": answer,
@@ -622,7 +650,7 @@ async def chat(req: ChatRequest):
                 print(f"✅ Tool result: {json.dumps(result, default=str)[:200]}")
 
                 # Save tool interaction
-                save_session_message(sid, "tool", json.dumps(result, default=str),
+                await save_session_message(sid, "tool", json.dumps(result, default=str),
                                      tool_call={"name": tool_name, "args": tool_args})
 
                 # Build function response part
@@ -647,8 +675,17 @@ async def chat(req: ChatRequest):
         print(f"❌ Chat error: {e}")
         import traceback
         traceback.print_exc()
+
+        # Attempt FAQ fallback for simple questions
+        try:
+            faq_answer = search_faq(req.message, detect_language(req.message))
+            if faq_answer:
+                return {"answer": faq_answer, "source": "faq_fallback", "toolCalls": []}
+        except Exception:
+            pass
+
         return {
-            "answer": "Sorry, something went wrong. Please try again! 😅",
+            "answer": "I'm experiencing high demand right now. Please try again in a moment! 😊",
             "source": "error",
         }
 
@@ -657,5 +694,5 @@ async def chat(req: ChatRequest):
 async def clear_session(session_id: str):
     """Clear a chat session's history."""
     if db is not None:
-        db.chat_sessions.delete_one({"sessionId": session_id})
+        await db.chat_sessions.delete_one({"sessionId": session_id})
     return {"message": "Session cleared"}
