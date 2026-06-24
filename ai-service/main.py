@@ -19,7 +19,8 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from contextlib import asynccontextmanager
 import os, json, httpx, time, sys, re, difflib, asyncio, random
 
 # Reconfigure stdout/stderr to UTF-8 to prevent UnicodeEncodeError on Windows terminals
@@ -31,10 +32,34 @@ if hasattr(sys.stderr, 'reconfigure'):
 load_dotenv()
 
 # ─────────────────────────────────────────────────────────────────────────────
+# MONGODB (for sessions + FAQ data)
+# ─────────────────────────────────────────────────────────────────────────────
+
+MONGO_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
+
+db = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global db
+    try:
+        mongo_client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        await mongo_client.admin.command('ping')
+        db = mongo_client["boxify"]
+        # Create TTL index on chat_sessions — auto-delete after 7 days
+        await db.chat_sessions.create_index("expiresAt", expireAfterSeconds=0)
+        print("✅ Connected to MongoDB")
+    except Exception as e:
+        print(f"❌ MongoDB error: {e}")
+        db = None
+    yield
+
+# ─────────────────────────────────────────────────────────────────────────────
 # APP SETUP
 # ─────────────────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="Boxify AI Service", version="2.0.0")
+app = FastAPI(title="Boxify AI Service", version="2.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -47,31 +72,7 @@ app.add_middleware(
 # ─────────────────────────────────────────────────────────────────────────────
 
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_ID = "gemini-2.5-flash-lite"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MONGODB (for sessions + FAQ data)
-# ─────────────────────────────────────────────────────────────────────────────
-
-MONGO_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
-
-db = None
-
-
-@app.on_event("startup")
-async def startup_db():
-    global db
-    try:
-        mongo_client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-        await mongo_client.admin.command('ping')
-        db = mongo_client["boxify"]
-        # Create TTL index on chat_sessions — auto-delete after 7 days
-        await db.chat_sessions.create_index("expiresAt", expireAfterSeconds=0)
-        print("✅ Connected to MongoDB")
-    except Exception as e:
-        print(f"❌ MongoDB error: {e}")
-        db = None
+MODEL_ID = "gemini-flash-latest"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FAQ DATASET
@@ -444,10 +445,11 @@ async def save_session_message(session_id: str, role: str, content: str, user_id
     if db is None:
         return
 
+    now = datetime.now(timezone.utc)
     message = {
         "role": role,
         "content": content,
-        "timestamp": datetime.utcnow(),
+        "timestamp": now,
     }
     if tool_call:
         message["toolCall"] = tool_call
@@ -459,13 +461,13 @@ async def save_session_message(session_id: str, role: str, content: str, user_id
         {
             "$push": {"messages": message},
             "$set": {
-                "updatedAt": datetime.utcnow(),
-                "expiresAt": datetime.utcnow() + timedelta(days=7),
+                "updatedAt": now,
+                "expiresAt": now + timedelta(days=7),
             },
             "$setOnInsert": {
                 "sessionId": session_id,
                 "userId": user_id,
-                "createdAt": datetime.utcnow(),
+                "createdAt": now,
             },
         },
         upsert=True,
@@ -519,6 +521,7 @@ class ChatRequest(BaseModel):
     message:    str
     session_id: Optional[str] = Field(default="default", alias="sessionId")
     user_token: Optional[str] = Field(default=None, alias="userToken")
+    model:      Optional[str] = Field(default=None)
     # `language` kept for backwards-compatibility but is now ignored —
     # language is auto-detected from the message text.
     language:   Optional[str] = Field(default=None, exclude=True)
@@ -528,12 +531,12 @@ class ChatRequest(BaseModel):
 # GEMINI RETRY HELPER
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def gemini_generate_with_retry(contents, config, max_retries=3):
+async def gemini_generate_with_retry(contents, config, model_id, max_retries=3):
     """Call Gemini with exponential backoff on rate-limit or transient errors."""
     for attempt in range(max_retries):
         try:
             response = await gemini_client.aio.models.generate_content(
-                model=MODEL_ID,
+                model=model_id,
                 contents=contents,
                 config=config,
             )
@@ -565,6 +568,7 @@ async def chat(req: ChatRequest):
     try:
         sid  = req.session_id or "default"
         user_token = req.user_token
+        model_id = req.model or MODEL_ID
 
         # Auto-detect language from the user's message
         lang = detect_language(req.message)
@@ -601,7 +605,7 @@ async def chat(req: ChatRequest):
         tool_calls_made = []
 
         for iteration in range(max_iterations):
-            response = await gemini_generate_with_retry(gemini_history, config)
+            response = await gemini_generate_with_retry(gemini_history, config, model_id)
 
             candidate = response.candidates[0]
             parts = candidate.content.parts
@@ -624,6 +628,7 @@ async def chat(req: ChatRequest):
                     "answer": answer,
                     "source": "gemini",
                     "toolCalls": tool_calls_made,
+                    "model": model_id,
                 }
 
             # Process function calls
@@ -669,6 +674,7 @@ async def chat(req: ChatRequest):
             "answer": "I'm having trouble processing your request. Could you try again?",
             "source": "error",
             "toolCalls": tool_calls_made,
+            "model": model_id,
         }
 
     except Exception as e:
@@ -680,13 +686,14 @@ async def chat(req: ChatRequest):
         try:
             faq_answer = search_faq(req.message, detect_language(req.message))
             if faq_answer:
-                return {"answer": faq_answer, "source": "faq_fallback", "toolCalls": []}
+                return {"answer": faq_answer, "source": "faq_fallback", "toolCalls": [], "model": model_id}
         except Exception:
             pass
 
         return {
             "answer": "I'm experiencing high demand right now. Please try again in a moment! 😊",
             "source": "error",
+            "model": model_id,
         }
 
 
