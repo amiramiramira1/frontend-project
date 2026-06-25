@@ -27,7 +27,7 @@ export default function CheckoutPage() {
   });
   const [errors, setErrors] = useState({ street: '', zip: '', phone: '', timeSlot: '', deliveryDate: '' });
 
-  const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
+  const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez', 'Assiut', 'El Minya'];
   const timeSlots = ['9AM–12PM', '12PM–3PM', '3PM–6PM', '6PM–9PM'];
 
   const [promoCode, setPromoCode] = useState('');
