@@ -866,7 +866,7 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
             elif tool_name == "create_custom_box":
                 if not user_token:
                     return {"error": "User must be logged in to create a box"}
-                payload = {"meals": args["mealIds"]}
+                payload = {"meals": args["mealIds"], "servingSize": int(args.get("servingSize", 2))}
                 if args.get("name"):
                     payload["name"] = args["name"]
                 resp = await client.post(f"{BACKEND_URL}/api/boxes/custom", headers=headers, json=payload)
@@ -1003,6 +1003,42 @@ async def save_session_message(session_id: str, role: str, content: str, user_id
         upsert=True,
     )
 
+
+async def get_flow_state(session_id: str) -> dict:
+    """Retrieve the active deterministic-flow state (currentFlow + per-flow sub-state)."""
+    if db is None:
+        return {}
+    session = await db.chat_sessions.find_one({"sessionId": session_id})
+    if not session:
+        return {}
+    return {
+        "currentFlow": session.get("currentFlow"),
+        "customBox": session.get("customBox") or {},
+    }
+
+
+async def save_flow_state(session_id: str, current_flow: Optional[str], custom_box: dict):
+    """Persist the active flow and its sub-state. `current_flow=None` clears the lock."""
+    if db is None:
+        return
+    now = datetime.now(timezone.utc)
+    await db.chat_sessions.update_one(
+        {"sessionId": session_id},
+        {
+            "$set": {
+                "currentFlow": current_flow,
+                "customBox": custom_box or {},
+                "updatedAt": now,
+                "expiresAt": now + timedelta(days=7),
+            },
+            "$setOnInsert": {
+                "sessionId": session_id,
+                "createdAt": now,
+            },
+        },
+        upsert=True,
+    )
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SYSTEM PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1052,6 +1088,12 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = Field(default="default", alias="sessionId")
     user_token: Optional[str] = Field(default=None, alias="userToken")
     model:      Optional[str] = Field(default=None)
+    # Explicit, button-driven flow control (deterministic flows).
+    # `flow` names the flow the user explicitly entered (e.g. "custom_box",
+    # "recommendation", "faq"); `action` carries a structured UI action for the
+    # active flow (e.g. {"type": "add_meal", "mealId": "..."}).
+    flow:       Optional[str] = Field(default=None)
+    action:     Optional[dict] = Field(default=None)
     # `language` kept for backwards-compatibility but is now ignored —
     # language is auto-detected from the message text.
     language:   Optional[str] = Field(default=None, exclude=True)
@@ -1103,6 +1145,508 @@ async def groq_generate_with_retry(messages, model_id, max_retries=3):
                 await asyncio.sleep(wait)
             else:
                 raise
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUILD-A-BOX DETERMINISTIC FLOW
+# ─────────────────────────────────────────────────────────────────────────────
+# A fixed, button-driven state machine that walks the user through building a
+# custom box. The machine — not the LLM — decides every step. The LLM is used
+# only to rephrase each step's canonical message (see narrate_step); if it fails
+# we fall back to the canonical template, so the flow always works.
+
+CUSTOM_BOX_SERVING_MULTIPLIERS = {1: 1, 2: 1.8, 4: 3.2, 6: 4.5}
+MAX_QTY_PER_MEAL = 3
+MAX_TOTAL_MEALS = 10
+
+# State-machine step identifiers
+BB_SELECTING = "SELECTING"
+BB_SERVING   = "ASK_SERVING"
+BB_PURCHASE  = "ASK_PURCHASE"
+BB_CONFIRM   = "CONFIRM"
+
+BUILD_BOX_SYSTEM_PROMPT = """You are Boxify Chef 🥕, guiding a user through a FIXED, step-by-step "build your own box" flow.
+You will be given the canonical message for the current step. Your ONLY job is to rephrase it warmly and naturally, in 1-2 short sentences.
+STRICT RULES:
+- Keep every fact, number, price, meal name, and choice EXACTLY as given. Invent nothing, add nothing, remove nothing.
+- Do NOT add new steps, options, meals, or questions.
+- Never ask the user to type IDs.
+- Reply in the SAME language as the user (Arabic Egyptian dialect or English). Never mix languages.
+Return only the rephrased message text, nothing else."""
+
+
+def _bb_text(key: str, lang: str, **kw) -> str:
+    """Canonical bilingual copy for each build-a-box step."""
+    en = {
+        "intro": "Let's build your custom box! 🥕 Pick the meals you'd like below — tap ＋ to add. You can filter by diet too.",
+        "filtered": "Showing {diet} meals. Tap ＋ to add the ones you like.",
+        "need_one": "Please add at least one meal to your box before we continue. 🙂",
+        "summary": "Your box so far: {items} — {count} meal(s), {price} EGP. Add more, or tap “Done selecting”.",
+        "ask_serving": "Great choice! How many people is this box for?",
+        "ask_purchase": "Perfect. Would you like this as a one-time order or a recurring subscription?",
+        "confirm": "Here's your box: {items}. Serving size {serving}, {ptype}. Total {price} EGP. Shall I create it?",
+        "created_cart": "Done! 🎉 I created your custom box and added it to your cart. Total {price} EGP.",
+        "created_sub": "Done! 🎉 Your {freq} for the custom box is all set up.",
+        "cancelled": "No problem — I've cancelled the box builder. Want to do something else?",
+        "create_failed": "Sorry, I couldn't create the box ({err}). Want to try again?",
+        "login_required": "You'll need to sign in first so I can create and order your custom box. 🙂",
+    }
+    ar = {
+        "intro": "يلا نبني البوكس بتاعك! 🥕 اختار الوجبات اللي تحبها من تحت — دوس ＋ عشان تضيف. وتقدر تفلتر حسب النظام الغذائي.",
+        "filtered": "دي وجبات {diet}. دوس ＋ عشان تضيف اللي يعجبك.",
+        "need_one": "ضيف وجبة واحدة على الأقل للبوكس قبل ما نكمّل. 🙂",
+        "summary": "البوكس لحد دلوقتي: {items} — {count} وجبة، {price} جنيه. ضيف كمان، أو دوس «خلصت الاختيار».",
+        "ask_serving": "اختيار جميل! البوكس ده لكام شخص؟",
+        "ask_purchase": "تمام. تحبه طلب لمرة واحدة ولا اشتراك متكرر؟",
+        "confirm": "ده البوكس بتاعك: {items}. حجم التقديم {serving}، {ptype}. الإجمالي {price} جنيه. أعمله؟",
+        "created_cart": "تمام! 🎉 عملت البوكس المخصص وضفته للسلة. الإجمالي {price} جنيه.",
+        "created_sub": "تمام! 🎉 {freq} للبوكس المخصص اتظبط.",
+        "cancelled": "ولا يهمك — لغيت بناء البوكس. تحب نعمل حاجة تانية؟",
+        "create_failed": "معلش، مقدرتش أعمل البوكس ({err}). نجرب تاني؟",
+        "login_required": "محتاج تسجّل دخول الأول عشان أقدر أعمل وأطلب البوكس المخصص. 🙂",
+    }
+    table = ar if lang == "ar" else en
+    return table.get(key, "").format(**kw)
+
+
+_DIET_CHIP_DEFS = [
+    ("all", "All", "الكل"), ("vegan", "Vegan", "نباتي"),
+    ("vegetarian", "Vegetarian", "نباتي كامل"), ("keto", "Keto", "كيتو"),
+    ("paleo", "Paleo", "باليو"), ("standard", "Standard", "عادي"),
+]
+
+
+def _ptype_label(ptype: str, lang: str) -> str:
+    if lang == "ar":
+        return {"one_time": "طلب لمرة واحدة", "weekly": "اشتراك أسبوعي", "monthly": "اشتراك شهري"}.get(ptype, ptype)
+    return {"one_time": "one-time order", "weekly": "weekly subscription", "monthly": "monthly subscription"}.get(ptype, ptype)
+
+
+def _diet_chips(lang: str, active: str) -> list:
+    chips = []
+    for val, en, ar in _DIET_CHIP_DEFS:
+        label = ar if lang == "ar" else en
+        prefix = "✓ " if (active or "all") == val else ""
+        chips.append({"text": prefix + label, "action": {"type": "set_diet", "diet": val}})
+    return chips
+
+
+def _selecting_quick_actions(lang: str, active_diet: str, has_selection: bool) -> list:
+    actions = _diet_chips(lang, active_diet)
+    if has_selection:
+        actions.append({"text": "خلصت الاختيار ←" if lang == "ar" else "Done selecting →",
+                        "action": {"type": "done_selecting"}})
+    actions.append({"text": "إلغاء" if lang == "ar" else "Cancel", "action": {"type": "cancel"}})
+    return actions
+
+
+def _serving_quick_actions(lang: str) -> list:
+    actions = []
+    for s in (1, 2, 4, 6):
+        if lang == "ar":
+            unit = "فرد" if s == 1 else "أفراد"
+        else:
+            unit = "person" if s == 1 else "people"
+        actions.append({"text": f"{s} {unit}", "action": {"type": "set_serving", "size": s}})
+    actions.append({"text": "إلغاء" if lang == "ar" else "Cancel", "action": {"type": "cancel"}})
+    return actions
+
+
+def _purchase_quick_actions(lang: str) -> list:
+    if lang == "ar":
+        opts = [("one_time", "لمرة واحدة"), ("weekly", "اشتراك أسبوعي"), ("monthly", "اشتراك شهري")]
+        cancel = "إلغاء"
+    else:
+        opts = [("one_time", "One-time"), ("weekly", "Weekly subscription"), ("monthly", "Monthly subscription")]
+        cancel = "Cancel"
+    actions = [{"text": lbl, "action": {"type": "set_purchase", "mode": mode}} for mode, lbl in opts]
+    actions.append({"text": cancel, "action": {"type": "cancel"}})
+    return actions
+
+
+def _confirm_quick_actions(lang: str) -> list:
+    if lang == "ar":
+        return [
+            {"text": "أكّد واعمل البوكس ✅", "action": {"type": "confirm"}},
+            {"text": "رجوع للوجبات", "action": {"type": "edit"}},
+            {"text": "إلغاء", "action": {"type": "cancel"}},
+        ]
+    return [
+        {"text": "Confirm & create ✅", "action": {"type": "confirm"}},
+        {"text": "Back to meals", "action": {"type": "edit"}},
+        {"text": "Cancel", "action": {"type": "cancel"}},
+    ]
+
+
+def _items_str(selection: dict, lang: str) -> str:
+    parts = []
+    for v in selection.values():
+        qty = int(v.get("qty", 1))
+        name = v.get("name") or ""
+        parts.append(f"{name} ×{qty}" if qty > 1 else name)
+    return ("، " if lang == "ar" else ", ").join(parts)
+
+
+def _selection_count(selection: dict) -> int:
+    return sum(int(v.get("qty", 1)) for v in selection.values())
+
+
+def _selection_items(selection: dict) -> list:
+    return [
+        {"id": mid, "name": v.get("name"), "price": v.get("price"), "qty": int(v.get("qty", 1))}
+        for mid, v in selection.items()
+    ]
+
+
+def _expand_meal_ids(selection: dict) -> list:
+    ids = []
+    for mid, v in selection.items():
+        ids.extend([mid] * int(v.get("qty", 1)))
+    return ids
+
+
+def _base_price(selection: dict) -> float:
+    return round(sum(float(v.get("price") or 0) * int(v.get("qty", 1)) for v in selection.values()), 2)
+
+
+def _bb_price_info(selection: dict, serving_size: Optional[int] = None, preview: Optional[dict] = None) -> dict:
+    base = _base_price(selection)
+    info = {"basePrice": base, "count": _selection_count(selection)}
+    if serving_size:
+        mult = CUSTOM_BOX_SERVING_MULTIPLIERS.get(serving_size, 1)
+        info["servingSize"] = serving_size
+        info["totalPrice"] = round(preview.get("priceForServingSize"), 2) if preview and preview.get("priceForServingSize") is not None else round(base * mult, 2)
+        if preview:
+            info["totalCalories"] = preview.get("totalCalories")
+            info["allergens"] = preview.get("allergens", [])
+    else:
+        info["totalPrice"] = base
+    return info
+
+
+def _selectable_meals(menu: list, selection: dict) -> list:
+    out = []
+    for m in menu:
+        mid = m.get("id")
+        out.append({**m, "selectedQty": int(selection.get(mid, {}).get("qty", 0)) if mid in selection else 0})
+    return out
+
+
+def _bb_add(selection: dict, menu: list, meal_id: str, delta: int):
+    """Add/adjust a meal in the selection, enforcing per-meal and total caps."""
+    if not meal_id:
+        return
+    menu_item = next((m for m in menu if m.get("id") == meal_id), None)
+    current = int(selection.get(meal_id, {}).get("qty", 0))
+    new_qty = current + delta
+    if new_qty <= 0:
+        selection.pop(meal_id, None)
+        return
+    new_qty = min(new_qty, MAX_QTY_PER_MEAL)
+    total_others = sum(int(v.get("qty", 1)) for k, v in selection.items() if k != meal_id)
+    if total_others + new_qty > MAX_TOTAL_MEALS:
+        new_qty = MAX_TOTAL_MEALS - total_others
+        if new_qty <= 0:
+            return
+    name = (menu_item or {}).get("name") or selection.get(meal_id, {}).get("name")
+    price = (menu_item or {}).get("price") if menu_item else selection.get(meal_id, {}).get("price")
+    selection[meal_id] = {"name": name, "price": price, "qty": new_qty}
+
+
+def _match_meals_from_text(text: str, menu: list) -> list:
+    """Fallback: resolve typed meal names or list positions to meal IDs."""
+    if not text or not menu:
+        return []
+    lower = text.lower()
+    matched = []
+    for n in re.findall(r"\b(\d{1,2})\b", lower):
+        idx = int(n) - 1
+        if 0 <= idx < len(menu):
+            matched.append(menu[idx].get("id"))
+    for m in menu:
+        name = (m.get("name") or "").lower()
+        if name and name in lower:
+            matched.append(m.get("id"))
+    return list(dict.fromkeys([m for m in matched if m]))
+
+
+def _has_confirm_text(text: str) -> bool:
+    low = (text or "").lower()
+    return any(w in low for w in [
+        "confirm", "yes", "yeah", "create", "go ahead", "ok", "okay", "sure",
+        "تمام", "اكد", "أكد", "اعمل", "ايوه", "أيوة", "نعم", "ماشي",
+    ])
+
+
+def _bb_response(answer: str, step: Optional[str], *, meals=None, selection=None,
+                 price=None, quick_actions=None, tool_calls=None) -> dict:
+    resp = {
+        "answer": answer,
+        "source": "build_box",
+        "flow": "custom_box" if step else None,
+        "flowState": step,
+        "toolCalls": tool_calls or [],
+        "model": MODEL_ID,
+        "mode": "custom_box",
+        "modeConfidence": 1.0,
+    }
+    if meals is not None:
+        resp["selectableMeals"] = meals
+    if selection is not None:
+        resp["selection"] = selection
+    if price is not None:
+        resp["priceInfo"] = price
+    if quick_actions is not None:
+        resp["quickActions"] = quick_actions
+    return resp
+
+
+async def narrate_step(canonical_text: str, lang: str) -> str:
+    """Rephrase a canonical step message via the LLM (fixed build-box prompt).
+    Falls back to the canonical text on any error or during tests."""
+    if not canonical_text:
+        return canonical_text
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return canonical_text
+    try:
+        resp = await groq_client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[
+                {"role": "system", "content": BUILD_BOX_SYSTEM_PROMPT},
+                {"role": "user", "content": f"User language: {lang}. Rephrase this step message, keeping every fact, number, price, meal name and choice exactly the same:\n\n{canonical_text}"},
+            ],
+            temperature=0.3,
+            max_tokens=220,
+        )
+        out = (resp.choices[0].message.content or "").strip()
+        return out or canonical_text
+    except Exception:
+        return canonical_text
+
+
+async def _calculate_custom_box(meal_ids: list, serving_size: int, user_token: Optional[str]) -> Optional[dict]:
+    """Call the backend price/calorie/allergen preview endpoint. Returns the
+    `preview` object or None on failure (auth required)."""
+    headers = {"Content-Type": "application/json"}
+    if user_token:
+        headers["Authorization"] = f"Bearer {user_token}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{BACKEND_URL}/api/boxes/custom/calculate",
+                headers=headers,
+                json={"mealIds": meal_ids, "servingSize": serving_size},
+            )
+            if resp.status_code >= 400:
+                return None
+            return resp.json().get("preview")
+    except Exception:
+        return None
+
+
+async def _bb_fetch_menu(diet: str, user_token: Optional[str], lang: str) -> list:
+    args = {}
+    if diet and diet != "all":
+        args["dietType"] = diet
+    result = await execute_tool("get_available_meals", args, user_token, lang)
+    return result.get("meals", []) if isinstance(result, dict) else []
+
+
+async def handle_custom_box_flow(req: "ChatRequest", sid: str, user_token: Optional[str],
+                                 lang: str, state: dict, action: dict) -> tuple[dict, Optional[dict]]:
+    """Deterministic build-a-box state machine.
+
+    Returns (response, new_state). `new_state is None` means the flow ended (or
+    was cancelled) and the lock should be released.
+    """
+    state = dict(state or {})
+    action = action or {}
+    atype = action.get("type")
+    message = req.message or ""
+
+    # Persist typed messages for the transcript (no-op when db is unavailable)
+    if message and atype in (None, "", "start"):
+        await save_session_message(sid, "user", message)
+
+    # Cancel from any step
+    if atype == "cancel":
+        txt = await narrate_step(_bb_text("cancelled", lang), lang)
+        await save_session_message(sid, "model", txt)
+        return _bb_response(txt, None), None
+
+    step = state.get("step")
+    selection = state.get("selection") or {}
+    diet = state.get("dietFilter") or "all"
+
+    # ── START / fresh entry ────────────────────────────────────────────────
+    if not step or atype == "start":
+        menu = await _bb_fetch_menu(diet, user_token, lang)
+        state = {"step": BB_SELECTING, "selection": selection, "dietFilter": diet, "menu": menu}
+        txt = await narrate_step(_bb_text("intro", lang), lang)
+        await save_session_message(sid, "model", txt)
+        return _bb_response(
+            txt, BB_SELECTING,
+            meals=_selectable_meals(menu, selection),
+            selection=_selection_items(selection),
+            price=_bb_price_info(selection),
+            quick_actions=_selecting_quick_actions(lang, diet, bool(selection)),
+        ), state
+
+    # ── SELECTING ──────────────────────────────────────────────────────────
+    if step == BB_SELECTING:
+        menu = state.get("menu") or []
+        ack = None
+        if atype == "set_diet":
+            diet = action.get("diet") or "all"
+            menu = await _bb_fetch_menu(diet, user_token, lang)
+            state["dietFilter"] = diet
+            state["menu"] = menu
+            label = next((a if lang == "ar" else e for v, e, a in _DIET_CHIP_DEFS if v == diet), diet)
+            ack = _bb_text("filtered", lang, diet=label)
+        elif atype == "add_meal":
+            _bb_add(selection, menu, action.get("mealId"), +1)
+        elif atype == "change_qty":
+            _bb_add(selection, menu, action.get("mealId"), int(action.get("delta", 0)))
+        elif atype == "done_selecting":
+            if not selection:
+                txt = _bb_text("need_one", lang)
+                return _bb_response(
+                    txt, BB_SELECTING,
+                    meals=_selectable_meals(menu, selection),
+                    selection=_selection_items(selection),
+                    price=_bb_price_info(selection),
+                    quick_actions=_selecting_quick_actions(lang, diet, False),
+                ), state
+            state["step"] = BB_SERVING
+            state["selection"] = selection
+            txt = await narrate_step(_bb_text("ask_serving", lang), lang)
+            await save_session_message(sid, "model", txt)
+            return _bb_response(
+                txt, BB_SERVING,
+                selection=_selection_items(selection),
+                price=_bb_price_info(selection),
+                quick_actions=_serving_quick_actions(lang),
+            ), state
+        else:
+            # Free-text fallback: match typed meal names / list positions
+            for mid in _match_meals_from_text(message, menu):
+                _bb_add(selection, menu, mid, +1)
+
+        state["selection"] = selection
+        if ack is None:
+            if selection:
+                ack = _bb_text("summary", lang, items=_items_str(selection, lang),
+                               count=_selection_count(selection), price=int(_base_price(selection)))
+            else:
+                ack = _bb_text("intro", lang)
+        return _bb_response(
+            ack, BB_SELECTING,
+            meals=_selectable_meals(menu, selection),
+            selection=_selection_items(selection),
+            price=_bb_price_info(selection),
+            quick_actions=_selecting_quick_actions(lang, diet, bool(selection)),
+        ), state
+
+    # ── ASK_SERVING ─────────────────────────────────────────────────────────
+    if step == BB_SERVING:
+        size = int(action.get("size")) if atype == "set_serving" and action.get("size") else _extract_serving_size(message)
+        if size not in (1, 2, 4, 6):
+            txt = _bb_text("ask_serving", lang)
+            return _bb_response(txt, BB_SERVING, selection=_selection_items(selection),
+                                price=_bb_price_info(selection), quick_actions=_serving_quick_actions(lang)), state
+        state["servingSize"] = size
+        state["step"] = BB_PURCHASE
+        txt = await narrate_step(_bb_text("ask_purchase", lang), lang)
+        await save_session_message(sid, "model", txt)
+        return _bb_response(txt, BB_PURCHASE, selection=_selection_items(selection),
+                            price=_bb_price_info(selection, size), quick_actions=_purchase_quick_actions(lang)), state
+
+    # ── ASK_PURCHASE ────────────────────────────────────────────────────────
+    if step == BB_PURCHASE:
+        mode = None
+        if atype == "set_purchase":
+            mode = action.get("mode")
+        else:
+            mode = _extract_frequency(message)
+            if not mode and any(w in message.lower() for w in ["one time", "one-time", "once", "single", "لمرة", "مرة واحدة", "مره واحده"]):
+                mode = "one_time"
+        if mode not in ("one_time", "weekly", "monthly"):
+            txt = _bb_text("ask_purchase", lang)
+            return _bb_response(txt, BB_PURCHASE, selection=_selection_items(selection),
+                                quick_actions=_purchase_quick_actions(lang)), state
+        state["purchaseType"] = mode
+        state["step"] = BB_CONFIRM
+        serving = state.get("servingSize", 2)
+        preview = await _calculate_custom_box(_expand_meal_ids(selection), serving, user_token)
+        price = _bb_price_info(selection, serving, preview)
+        state["priceInfo"] = price
+        txt = await narrate_step(_bb_text("confirm", lang, items=_items_str(selection, lang),
+                                          serving=serving, ptype=_ptype_label(mode, lang),
+                                          price=price.get("totalPrice")), lang)
+        await save_session_message(sid, "model", txt)
+        return _bb_response(txt, BB_CONFIRM, selection=_selection_items(selection),
+                            price=price, quick_actions=_confirm_quick_actions(lang)), state
+
+    # ── CONFIRM ─────────────────────────────────────────────────────────────
+    if step == BB_CONFIRM:
+        if atype == "edit":
+            state["step"] = BB_SELECTING
+            menu = state.get("menu") or await _bb_fetch_menu(diet, user_token, lang)
+            state["menu"] = menu
+            txt = await narrate_step(_bb_text("intro", lang), lang)
+            return _bb_response(txt, BB_SELECTING, meals=_selectable_meals(menu, selection),
+                                selection=_selection_items(selection), price=_bb_price_info(selection),
+                                quick_actions=_selecting_quick_actions(lang, diet, bool(selection))), state
+
+        if atype == "confirm" or _has_confirm_text(message):
+            if not user_token:
+                txt = await narrate_step(_bb_text("login_required", lang), lang)
+                await save_session_message(sid, "model", txt)
+                return _bb_response(txt, BB_CONFIRM, selection=_selection_items(selection),
+                                    price=state.get("priceInfo"), quick_actions=_confirm_quick_actions(lang)), state
+
+            serving = state.get("servingSize", 2)
+            ptype = state.get("purchaseType", "one_time")
+            meal_ids = _expand_meal_ids(selection)
+            tool_calls = []
+
+            create_args = {"mealIds": meal_ids, "servingSize": serving}
+            create_res = await execute_tool("create_custom_box", create_args, user_token, lang)
+            tool_calls.append({"tool": "create_custom_box", "args": create_args, "result": create_res})
+            if not isinstance(create_res, dict) or not create_res.get("success"):
+                err = (create_res or {}).get("error", "unknown error")
+                txt = await narrate_step(_bb_text("create_failed", lang, err=err), lang)
+                await save_session_message(sid, "model", txt)
+                return _bb_response(txt, BB_CONFIRM, selection=_selection_items(selection),
+                                    price=state.get("priceInfo"), quick_actions=_confirm_quick_actions(lang),
+                                    tool_calls=tool_calls), state
+
+            box_id = create_res.get("boxId")
+            if ptype == "one_time":
+                cart_args = {"boxId": box_id, "servingSize": serving, "quantity": 1}
+                cart_res = await execute_tool("add_to_cart", cart_args, user_token, lang)
+                tool_calls.append({"tool": "add_to_cart", "args": cart_args, "result": cart_res})
+                total = (cart_res or {}).get("cartTotal") or (state.get("priceInfo") or {}).get("totalPrice")
+                txt = await narrate_step(_bb_text("created_cart", lang, price=total), lang)
+            else:
+                sub_args = {"boxId": box_id, "servingSize": serving, "frequency": ptype}
+                sub_res = await execute_tool("create_subscription", sub_args, user_token, lang)
+                tool_calls.append({"tool": "create_subscription", "args": sub_args, "result": sub_res})
+                txt = await narrate_step(_bb_text("created_sub", lang, freq=_ptype_label(ptype, lang)), lang)
+
+            await save_session_message(sid, "model", txt)
+            return _bb_response(txt, None, tool_calls=tool_calls), None
+
+        # Unrecognized input at confirm — re-prompt
+        txt = _bb_text("confirm", lang, items=_items_str(selection, lang),
+                       serving=state.get("servingSize", 2),
+                       ptype=_ptype_label(state.get("purchaseType", "one_time"), lang),
+                       price=(state.get("priceInfo") or {}).get("totalPrice"))
+        return _bb_response(txt, BB_CONFIRM, selection=_selection_items(selection),
+                            price=state.get("priceInfo"), quick_actions=_confirm_quick_actions(lang)), state
+
+    # Unknown step — restart the flow defensively
+    return await handle_custom_box_flow(req, sid, user_token, lang, {}, {"type": "start"})
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN CHAT ENDPOINT
@@ -1240,16 +1784,46 @@ async def chat(req: ChatRequest):
 
         # Auto-detect language from the user's message
         lang = detect_language(req.message)
+
+        is_testing = "PYTEST_CURRENT_TEST" in os.environ and not getattr(sys.modules[__name__], "FORCE_FAST_PATH", False)
+
+        # ── Explicit / locked deterministic flows ─────────────────────────────
+        flow_state = await get_flow_state(sid)
+        active_flow = (flow_state or {}).get("currentFlow")
+        incoming_flow = req.flow
+        action = req.action or {}
+
+        enter_custom = False
+        if incoming_flow == "custom_box" or active_flow == "custom_box":
+            enter_custom = True
+        elif not incoming_flow and not active_flow and not is_testing:
+            # Free-typed build-a-box requests also enter the deterministic flow
+            if determine_next_mode(req.message, lang, None)[0] == "custom_box":
+                enter_custom = True
+
+        if enter_custom:
+            custom_state = (flow_state or {}).get("customBox") or {}
+            if incoming_flow == "custom_box" and action.get("type") == "start":
+                custom_state = {}
+            response, new_state = await handle_custom_box_flow(req, sid, user_token, lang, custom_state, action)
+            await save_flow_state(sid, "custom_box" if new_state is not None else None, new_state or {})
+            return response
+
+        # A non-custom explicit flow releases any locked custom-box flow
+        if active_flow == "custom_box" and incoming_flow and incoming_flow != "custom_box":
+            await save_flow_state(sid, None, {})
+
         history = await get_session_history(sid)
 
-        # Load session mode, determine next mode, and save it
+        # Load session mode, determine next mode, and save it (explicit flow wins)
         current_mode = await get_session_mode(sid)
-        mode, confidence, reason = determine_next_mode(req.message, lang, current_mode)
+        if incoming_flow in ("recommendation", "faq", "dialogue"):
+            mode, confidence, reason = incoming_flow, 1.0, "explicit_flow"
+        else:
+            mode, confidence, reason = determine_next_mode(req.message, lang, current_mode)
         await save_session_mode(sid, mode)
 
         # ── Intent Router (Phase 3) ───────────────────────────────────────────
-        is_testing = "PYTEST_CURRENT_TEST" in os.environ and not getattr(sys.modules[__name__], "FORCE_FAST_PATH", False)
-        
         if not is_testing:
             intent = mode
             
@@ -1328,45 +1902,6 @@ async def chat(req: ChatRequest):
                     mode,
                     confidence,
                 )
-
-            elif intent == 'custom_box':
-                tool_name, tool_args = _custom_box_prefetch_args(req.message)
-                tool_result = await execute_tool(tool_name, tool_args, user_token, lang)
-                result = await _prefetch_tool_then_narrate(
-                    tool_name,
-                    tool_args,
-                    tool_result,
-                    history,
-                    sid,
-                    req.message,
-                    user_token,
-                    lang,
-                    model_id,
-                    mode,
-                    confidence,
-                )
-                if tool_name == "create_custom_box":
-                    frequency = _extract_frequency(req.message)
-                    serving_size = _extract_serving_size(req.message)
-                    box_id = tool_result.get("boxId") if isinstance(tool_result, dict) else None
-                    if box_id and serving_size:
-                        if frequency:
-                            sub_args = {"boxId": box_id, "servingSize": serving_size, "frequency": frequency}
-                            sub_result = await execute_tool("create_subscription", sub_args, user_token, lang)
-                            result.setdefault("toolCalls", []).append({
-                                "tool": "create_subscription",
-                                "args": sub_args,
-                                "result": sub_result,
-                            })
-                        else:
-                            cart_args = {"boxId": box_id, "servingSize": serving_size, "quantity": 1}
-                            cart_result = await execute_tool("add_to_cart", cart_args, user_token, lang)
-                            result.setdefault("toolCalls", []).append({
-                                "tool": "add_to_cart",
-                                "args": cart_args,
-                                "result": cart_result,
-                            })
-                return result
 
             elif intent == 'dialogue':
                 direct_answer = _standard_boxify_dialogue(req.message, lang)
@@ -1566,10 +2101,6 @@ def _extract_preferences(text: str) -> dict:
     return prefs
 
 
-def _extract_meal_ids(text: str) -> list[str]:
-    return re.findall(r"\bmeal[_-]?[a-z0-9]+\b", text.lower())
-
-
 def _extract_serving_size(text: str) -> Optional[int]:
     match = re.search(r"\b(1|2|4|6)\s*(?:people|person|servings?|افراد|أفراد|اشخاص|أشخاص)?\b", text.lower())
     return int(match.group(1)) if match else None
@@ -1582,22 +2113,3 @@ def _extract_frequency(text: str) -> Optional[str]:
     if "monthly" in lower or "شهري" in lower:
         return "monthly"
     return None
-
-
-def _has_confirmation(text: str) -> bool:
-    lower = text.lower()
-    return any(word in lower for word in ["confirm", "go ahead", "create", "yes", "تمام", "اكد", "أكد", "اعمل"])
-
-
-def _custom_box_prefetch_args(req_message: str) -> tuple[str, dict]:
-    meal_ids = _extract_meal_ids(req_message)
-    if meal_ids:
-        if _has_confirmation(req_message):
-            return "create_custom_box", {"mealIds": meal_ids}
-        else:
-            return "get_available_meals", {"mealIds": meal_ids}
-    args = {}
-    diet = _extract_diet_hint(req_message)
-    if diet:
-        args["dietType"] = diet
-    return "get_available_meals", args

@@ -16,6 +16,8 @@ export default function Chatbot() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeFlow, setActiveFlow] = useState(null);   // locked deterministic flow (e.g. 'custom_box')
+  const [pendingFlow, setPendingFlow] = useState(null); // one-shot flow hint for the next typed message
   const [sessionId] = useState(() => 'session_' + Math.random().toString(36).substr(2, 9));
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -46,35 +48,47 @@ export default function Chatbot() {
 
     const quickActions = lang === 'en'
       ? [
-          { text: '📦 Recommend a box', action: 'I want a box recommendation' },
-          { text: '🛠️ Build my own box', action: 'I want to build my own custom box' },
-          { text: '❓ Ask a question', action: null },
+          { text: '📦 Recommend a box', send: { message: 'I want a box recommendation', flow: 'recommendation' } },
+          { text: '🛠️ Build my own box', send: { message: '', flow: 'custom_box', action: { type: 'start' } } },
+          { text: '❓ Ask a question', focus: true, pendingFlow: 'faq' },
         ]
       : [
-          { text: '📦 اقترح بوكس', action: 'عايز اقتراح لبوكس' },
-          { text: '🛠️ ابني بوكسي', action: 'عايز أبني بوكس مخصص' },
-          { text: '❓ اسأل سؤال', action: null },
+          { text: '📦 اقترح بوكس', send: { message: 'عايز اقتراح لبوكس', flow: 'recommendation' } },
+          { text: '🛠️ ابني بوكسي', send: { message: '', flow: 'custom_box', action: { type: 'start' } } },
+          { text: '❓ اسأل سؤال', focus: true, pendingFlow: 'faq' },
         ];
 
     setMessages([{ from: 'bot', text: welcome, quickActions }]);
   }
 
-  async function sendMessage(overrideMessage = null) {
-    const userMessage = overrideMessage || input.trim();
-    if (!userMessage || loading) return;
-    if (!overrideMessage) setInput('');
+  // sendMessage supports both free-typed messages and structured flow actions.
+  // opts: { flow, action } \u2014 `flow` locks a deterministic flow (e.g. 'custom_box');
+  // `action` is a structured UI action (e.g. { type: 'add_meal', mealId }).
+  async function sendMessage(overrideMessage = null, opts = {}) {
+    const { flow, action } = opts;
+    const isTyped = overrideMessage === null;
+    const userMessage = isTyped ? input.trim() : (overrideMessage || '');
+    if (loading) return;
+    if (!userMessage && !action) return; // nothing to send
+    if (isTyped) setInput('');
 
-    // Auto-detect language of the user message to keep UI layout and language consistent
-    const promptLang = /[\u0600-\u06FF]/.test(userMessage) ? 'ar' : 'en';
-    if (promptLang !== language) {
-      setLanguage(promptLang);
+    // Resolve which flow this turn belongs to: explicit > one-shot hint > active lock
+    const effectiveFlow = flow || pendingFlow || activeFlow || null;
+    if (pendingFlow) setPendingFlow(null);
+
+    // Auto-detect language only for real typed text
+    if (userMessage) {
+      const promptLang = /[\u0600-\u06FF]/.test(userMessage) ? 'ar' : 'en';
+      if (promptLang !== language) setLanguage(promptLang);
     }
 
-    setMessages(prev => [...prev, { from: 'user', text: userMessage }]);
+    // Only show a user bubble for real text (not for silent button actions)
+    if (userMessage) {
+      setMessages(prev => [...prev, { from: 'user', text: userMessage }]);
+    }
     setLoading(true);
 
     try {
-      // Get token from localStorage
       const token = localStorage.getItem('boxify_token');
 
       const res = await fetch(API_BASE + '/chat', {
@@ -88,16 +102,27 @@ export default function Chatbot() {
           sessionId,
           language,
           userToken: token || null,
+          flow: effectiveFlow,
+          action: action || null,
         }),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const answerText = data.answer || '';
-      const toolCalls = data.toolCalls || [];
 
-      // Parse tool results for rich rendering
-      const richData = parseToolResults(toolCalls);
+      // Track the locked flow returned by the server (null once the flow ends)
+      setActiveFlow(data.flow || null);
+
+      // Parse tool results (cart/box/subscription confirmations) + build-flow UI data
+      const richData = {
+        ...parseToolResults(data.toolCalls || []),
+        ...(data.selectableMeals ? { selectableMeals: data.selectableMeals } : {}),
+        ...(data.selection ? { selection: data.selection } : {}),
+        ...(data.priceInfo ? { priceInfo: data.priceInfo } : {}),
+        ...(data.quickActions ? { quickActions: data.quickActions } : {}),
+        ...(data.flowState ? { flowState: data.flowState } : {}),
+      };
 
       setMessages(prev => [...prev, {
         from: 'bot',
@@ -142,13 +167,46 @@ export default function Chatbot() {
   async function clearChat() {
     setLanguage(null);
     setMessages([]);
+    setActiveFlow(null);
+    setPendingFlow(null);
     try {
       await fetch(`${API_BASE}/session/${sessionId}`, { method: 'DELETE' });
     } catch { /* ignore */ }
   }
 
-  function handleQuickAction(action) {
-    if (action) sendMessage(action);
+  // Unified quick-action dispatcher. A quick action can either:
+  //  - { focus: true }                       → focus the input (and arm a flow hint)
+  //  - { send: { message, flow, action } }   → send a free-typed/flow message
+  //  - { action: {…} }                       → server build-flow chip (structured)
+  //  - { action: 'text' }                    → legacy: send the text as a message
+  function dispatchQuickAction(qa) {
+    if (!qa) return;
+    if (qa.focus) {
+      if (qa.pendingFlow) setPendingFlow(qa.pendingFlow);
+      inputRef.current?.focus();
+      return;
+    }
+    if (qa.send) {
+      sendMessage(qa.send.message ?? '', { flow: qa.send.flow, action: qa.send.action });
+      return;
+    }
+    if (qa.action && typeof qa.action === 'object') {
+      sendMessage('', { flow: 'custom_box', action: qa.action });
+      return;
+    }
+    if (typeof qa.action === 'string') {
+      sendMessage(qa.action);
+      return;
+    }
+    inputRef.current?.focus();
+  }
+
+  // Convenience helpers for the interactive build-a-box meal list
+  function addMeal(mealId) {
+    sendMessage('', { flow: 'custom_box', action: { type: 'add_meal', mealId } });
+  }
+  function changeMealQty(mealId, delta) {
+    sendMessage('', { flow: 'custom_box', action: { type: 'change_qty', mealId, delta } });
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────
@@ -237,6 +295,99 @@ export default function Chatbot() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  // Interactive meal list for the build-a-box flow: each meal has Add / ＋ / − controls
+  function renderSelectableMeals(meals) {
+    return (
+      <div className="chat-scrollbar" style={{ marginTop: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+        {meals.map((meal, i) => {
+          const qty = meal.selectedQty || 0;
+          const isAdded = qty > 0;
+          return (
+            <div key={meal.id || i} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '8px 10px', borderRadius: '8px',
+              background: isAdded ? '#fff8ed' : (i % 2 === 0 ? '#f9fafb' : '#fff'),
+              border: isAdded ? '1px solid #ffce93' : '1px solid transparent',
+              fontSize: '12px', marginBottom: '3px',
+            }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ fontWeight: 600, color: '#333' }}>{meal.name}</span>
+                {meal.allergens?.length > 0 && (
+                  <span style={{ fontSize: '10px', color: '#ef5350', marginLeft: '6px' }}>
+                    ⚠️ {meal.allergens.join(', ')}
+                  </span>
+                )}
+                <div style={{ fontSize: '10px', color: '#999' }}>
+                  {meal.price} EGP{meal.calories ? ` · ${meal.calories} cal` : ''}
+                </div>
+              </div>
+              {!isAdded ? (
+                <button
+                  onClick={() => addMeal(meal.id)}
+                  disabled={loading}
+                  style={{
+                    flexShrink: 0, marginLeft: '8px', padding: '5px 12px', borderRadius: '8px',
+                    border: '1.5px solid #f57c00', background: '#fff', color: '#e65100',
+                    fontSize: '11px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  ＋ {language === 'en' ? 'Add' : 'أضف'}
+                </button>
+              ) : (
+                <div style={{
+                  flexShrink: 0, marginLeft: '8px', display: 'flex', alignItems: 'center', gap: '6px',
+                  background: '#fff', borderRadius: '8px', padding: '2px',
+                }}>
+                  <button onClick={() => changeMealQty(meal.id, -1)} disabled={loading}
+                    style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #e0e0e0', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>−</button>
+                  <span style={{ fontWeight: 700, minWidth: '14px', textAlign: 'center' }}>{qty}</span>
+                  <button onClick={() => changeMealQty(meal.id, +1)} disabled={loading}
+                    style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #e0e0e0', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>＋</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Running selection summary + live price for the build-a-box flow
+  function renderSelectionSummary(selection, priceInfo) {
+    if ((!selection || selection.length === 0) && !priceInfo) return null;
+    return (
+      <div style={{
+        marginTop: '8px', background: '#fffaf0', border: '1px solid #ffe0b2',
+        borderRadius: '10px', padding: '10px 12px', fontSize: '12px',
+      }}>
+        {selection && selection.length > 0 && (
+          <>
+            <div style={{ fontWeight: 700, color: '#e65100', marginBottom: '4px' }}>
+              {language === 'en' ? 'Your box' : 'البوكس بتاعك'}
+            </div>
+            {selection.map((item, i) => (
+              <div key={item.id || i} style={{ display: 'flex', justifyContent: 'space-between', color: '#555', padding: '1px 0' }}>
+                <span>{item.name}{item.qty > 1 ? ` ×${item.qty}` : ''}</span>
+                <span>{item.price != null ? `${Math.round(item.price * (item.qty || 1))} EGP` : ''}</span>
+              </div>
+            ))}
+          </>
+        )}
+        {priceInfo && (
+          <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #ffe0b2', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, color: '#333' }}>{language === 'en' ? 'Total' : 'الإجمالي'}</span>
+            <span style={{ fontWeight: 800, color: '#e65100', fontSize: '14px' }}>{priceInfo.totalPrice} EGP</span>
+          </div>
+        )}
+        {priceInfo?.allergens?.length > 0 && (
+          <div style={{ marginTop: '4px', fontSize: '10px', color: '#ef6c00' }}>
+            ⚠️ {language === 'en' ? 'Contains: ' : 'يحتوي على: '}{priceInfo.allergens.join(', ')}
+          </div>
+        )}
       </div>
     );
   }
@@ -463,10 +614,24 @@ export default function Chatbot() {
                       </div>
                     )}
 
-                    {/* Rich content: meal list */}
+                    {/* Rich content: meal list (legacy / read-only) */}
                     {msg.from === 'bot' && msg.meals && msg.meals.length > 0 && (
                       <div style={{ marginLeft: '32px' }}>
                         {renderMealList(msg.meals)}
+                      </div>
+                    )}
+
+                    {/* Rich content: interactive build-a-box meal selection */}
+                    {msg.from === 'bot' && msg.selectableMeals && msg.selectableMeals.length > 0 && (
+                      <div style={{ marginLeft: '32px' }}>
+                        {renderSelectableMeals(msg.selectableMeals)}
+                      </div>
+                    )}
+
+                    {/* Rich content: build-a-box selection summary + price */}
+                    {msg.from === 'bot' && ((msg.selection && msg.selection.length > 0) || (msg.priceInfo && msg.flowState !== 'SELECTING')) && (
+                      <div style={{ marginLeft: '32px' }}>
+                        {renderSelectionSummary(msg.selection, msg.priceInfo)}
                       </div>
                     )}
 
@@ -484,26 +649,33 @@ export default function Chatbot() {
                       </div>
                     )}
 
-                    {/* Quick action buttons */}
+                    {/* Quick action buttons (welcome chips + build-a-box step chips) */}
                     {msg.from === 'bot' && msg.quickActions && (
                       <div style={{ marginLeft: '32px', display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                        {msg.quickActions.map((qa, j) => (
-                          <button
-                            key={j}
-                            onClick={() => qa.action ? handleQuickAction(qa.action) : inputRef.current?.focus()}
-                            style={{
-                              padding: '7px 14px', borderRadius: '20px',
-                              border: '1.5px solid #ff9800', background: '#fff',
-                              color: '#e65100', fontSize: '12px', cursor: 'pointer',
-                              fontWeight: 600, transition: 'all 0.2s',
-                              whiteSpace: 'nowrap',
-                            }}
-                            onMouseOver={e => { e.currentTarget.style.background = '#fff3e0'; }}
-                            onMouseOut={e => { e.currentTarget.style.background = '#fff'; }}
-                          >
-                            {qa.text}
-                          </button>
-                        ))}
+                        {msg.quickActions.map((qa, j) => {
+                          const isCancel = qa.action?.type === 'cancel';
+                          const isPrimary = qa.action?.type === 'confirm' || qa.action?.type === 'done_selecting';
+                          return (
+                            <button
+                              key={j}
+                              onClick={() => dispatchQuickAction(qa)}
+                              disabled={loading}
+                              style={{
+                                padding: '7px 14px', borderRadius: '20px',
+                                border: isCancel ? '1.5px solid #e0e0e0' : '1.5px solid #ff9800',
+                                background: isPrimary ? 'linear-gradient(135deg, #ff9800, #f57c00)' : '#fff',
+                                color: isPrimary ? '#fff' : (isCancel ? '#999' : '#e65100'),
+                                fontSize: '12px', cursor: loading ? 'not-allowed' : 'pointer',
+                                fontWeight: isPrimary ? 700 : 600, transition: 'all 0.2s',
+                                whiteSpace: 'nowrap', opacity: loading ? 0.6 : 1,
+                              }}
+                              onMouseOver={e => { if (!isPrimary) e.currentTarget.style.background = '#fff3e0'; }}
+                              onMouseOut={e => { if (!isPrimary) e.currentTarget.style.background = '#fff'; }}
+                            >
+                              {qa.text}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

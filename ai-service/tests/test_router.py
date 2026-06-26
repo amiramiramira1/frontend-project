@@ -270,126 +270,33 @@ async def test_chat_recommendation_prefetch_path():
 
 
 @pytest.mark.asyncio
-async def test_chat_custom_box_start_path():
-    main.FORCE_FAST_PATH = True
-    
+async def test_chat_explicit_custom_box_flow_endpoint():
+    """An explicit flow='custom_box' enters the deterministic state machine and
+    returns selectable meals — regardless of the classifier."""
     mock_db = MagicMock()
     mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
-    
-    meals_result = {"meals": [{"id": "m1", "name": "Steak", "price": 90}], "count": 1}
-    
-    mock_completion = MagicMock()
-    mock_choice = MagicMock()
-    mock_choice.message.content = "I found these meals: Steak. What serving size do you want?"
-    mock_choice.message.tool_calls = None
-    mock_completion.choices = [mock_choice]
-    
+    mock_db.chat_sessions.update_one = AsyncMock(return_value=None)
+
+    menu = {"meals": [{"id": "m1", "name": "Steak", "price": 90, "calories": 300, "allergens": []}], "count": 1}
+
     with patch("main.db", mock_db), \
-         patch("main.execute_tool", new=AsyncMock(return_value=meals_result)), \
-         patch("main.save_session_message", new=AsyncMock()), \
-         patch("main.save_session_mode", new=AsyncMock()), \
-         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
-         
+         patch("main.execute_tool", new=AsyncMock(return_value=menu)):
+
         async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
             resp = await client.post("/chat", json={
-                "message": "build a custom box",
-                "sessionId": "custom-start-test"
+                "message": "",
+                "sessionId": "explicit-bb",
+                "flow": "custom_box",
+                "action": {"type": "start"},
             })
-            
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["mode"] == "custom_box"
-        assert len(body["toolCalls"]) == 1
-        assert body["toolCalls"][0]["tool"] == "get_available_meals"
-        
-    main.FORCE_FAST_PATH = False
 
-
-@pytest.mark.asyncio
-async def test_chat_custom_box_creation_and_cart():
-    main.FORCE_FAST_PATH = True
-    
-    mock_db = MagicMock()
-    mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
-    
-    def side_effect(tool_name, args, token, lang):
-        if tool_name == "create_custom_box":
-            return {"success": True, "boxId": "box_123"}
-        elif tool_name == "add_to_cart":
-            return {"success": True, "message": "Added to cart"}
-        return {}
-        
-    mock_completion = MagicMock()
-    mock_choice = MagicMock()
-    mock_choice.message.content = "Your custom box is created and added to cart!"
-    mock_choice.message.tool_calls = None
-    mock_completion.choices = [mock_choice]
-    
-    with patch("main.db", mock_db), \
-         patch("main.execute_tool", new=AsyncMock(side_effect=side_effect)), \
-         patch("main.save_session_message", new=AsyncMock()), \
-         patch("main.save_session_mode", new=AsyncMock()), \
-         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
-         
-        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
-            resp = await client.post("/chat", json={
-                "message": "create box using meal_a and meal_b for 2 people. I confirm - go ahead.",
-                "sessionId": "custom-cart-test",
-                "userToken": "mock_token"
-            })
-            
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["mode"] == "custom_box"
-        # Tool calls should include create_custom_box and add_to_cart
-        tool_names = [tc["tool"] for tc in body["toolCalls"]]
-        assert "create_custom_box" in tool_names
-        assert "add_to_cart" in tool_names
-        
-    main.FORCE_FAST_PATH = False
-
-
-@pytest.mark.asyncio
-async def test_chat_custom_box_creation_and_subscription():
-    main.FORCE_FAST_PATH = True
-    
-    mock_db = MagicMock()
-    mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
-    
-    def side_effect(tool_name, args, token, lang):
-        if tool_name == "create_custom_box":
-            return {"success": True, "boxId": "box_123"}
-        elif tool_name == "create_subscription":
-            return {"success": True, "message": "Subscription created"}
-        return {}
-        
-    mock_completion = MagicMock()
-    mock_choice = MagicMock()
-    mock_choice.message.content = "Your custom box subscription is created!"
-    mock_choice.message.tool_calls = None
-    mock_completion.choices = [mock_choice]
-    
-    with patch("main.db", mock_db), \
-         patch("main.execute_tool", new=AsyncMock(side_effect=side_effect)), \
-         patch("main.save_session_message", new=AsyncMock()), \
-         patch("main.save_session_mode", new=AsyncMock()), \
-         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
-         
-        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
-            resp = await client.post("/chat", json={
-                "message": "create box using meal_a and meal_b weekly for 4 people. I confirm - go ahead.",
-                "sessionId": "custom-sub-test",
-                "userToken": "mock_token"
-            })
-            
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["mode"] == "custom_box"
-        tool_names = [tc["tool"] for tc in body["toolCalls"]]
-        assert "create_custom_box" in tool_names
-        assert "create_subscription" in tool_names
-        
-    main.FORCE_FAST_PATH = False
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "build_box"
+    assert body["flow"] == "custom_box"
+    assert body["flowState"] == main.BB_SELECTING
+    assert len(body["selectableMeals"]) == 1
+    assert any(q["action"].get("type") == "set_diet" for q in body["quickActions"])
 
 
 @pytest.mark.asyncio
@@ -527,6 +434,162 @@ async def test_chat_switching_continuation_in_custom_box():
         body = resp.json()
         assert body["mode"] == "custom_box"
         mock_save_mode.assert_called_with("switch-cont-test", "custom_box")
-        
+
     main.FORCE_FAST_PATH = False
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. Build-a-Box Deterministic State Machine (unit)
+# ═══════════════════════════════════════════════════════════════════════════════
+# These call handle_custom_box_flow directly. narrate_step returns the canonical
+# text under pytest, so assertions are deterministic. save_session_message no-ops
+# because db is None at module load.
+
+def _req(message="", action=None):
+    return main.ChatRequest(message=message, session_id="bb", user_token="tok",
+                            flow="custom_box", action=action)
+
+MENU = [
+    {"id": "m1", "name": "Steak", "price": 90, "calories": 300, "allergens": []},
+    {"id": "m2", "name": "Salad", "price": 50, "calories": 150, "allergens": ["nuts"]},
+]
+
+
+@pytest.mark.asyncio
+async def test_bb_start_lists_selectable_meals():
+    with patch("main.execute_tool", new=AsyncMock(return_value={"meals": MENU, "count": 2})):
+        action = {"type": "start"}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", {}, action)
+    assert resp["flow"] == "custom_box"
+    assert resp["flowState"] == main.BB_SELECTING
+    assert len(resp["selectableMeals"]) == 2
+    assert any(q["action"].get("type") == "set_diet" for q in resp["quickActions"])
+    assert state["step"] == main.BB_SELECTING
+
+
+@pytest.mark.asyncio
+async def test_bb_add_meal_and_qty_caps():
+    state = {"step": main.BB_SELECTING, "selection": {}, "dietFilter": "all", "menu": MENU}
+    action = {"type": "add_meal", "mealId": "m1"}
+    resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state["selection"]["m1"]["qty"] == 1
+    # Per-meal cap is enforced
+    for _ in range(5):
+        action = {"type": "change_qty", "mealId": "m1", "delta": 1}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state["selection"]["m1"]["qty"] == main.MAX_QTY_PER_MEAL
+    # Removing past zero drops the meal
+    for _ in range(main.MAX_QTY_PER_MEAL):
+        action = {"type": "change_qty", "mealId": "m1", "delta": -1}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert "m1" not in state["selection"]
+
+
+@pytest.mark.asyncio
+async def test_bb_done_selecting_requires_one_meal():
+    state = {"step": main.BB_SELECTING, "selection": {}, "dietFilter": "all", "menu": MENU}
+    action = {"type": "done_selecting"}
+    resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    # Empty selection keeps us in SELECTING
+    assert resp["flowState"] == main.BB_SELECTING
+    assert state["step"] == main.BB_SELECTING
+
+
+@pytest.mark.asyncio
+async def test_bb_done_selecting_advances_to_serving():
+    state = {"step": main.BB_SELECTING, "dietFilter": "all", "menu": MENU,
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    action = {"type": "done_selecting"}
+    resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert resp["flowState"] == main.BB_SERVING
+    assert any(q["action"].get("type") == "set_serving" for q in resp["quickActions"])
+
+
+@pytest.mark.asyncio
+async def test_bb_serving_advances_to_purchase():
+    state = {"step": main.BB_SERVING, "dietFilter": "all", "menu": MENU,
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    action = {"type": "set_serving", "size": 2}
+    resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state["servingSize"] == 2
+    assert resp["flowState"] == main.BB_PURCHASE
+    assert any(q["action"].get("type") == "set_purchase" for q in resp["quickActions"])
+
+
+@pytest.mark.asyncio
+async def test_bb_purchase_advances_to_confirm_with_price():
+    state = {"step": main.BB_PURCHASE, "dietFilter": "all", "menu": MENU, "servingSize": 2,
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    preview = {"priceForServingSize": 162, "totalCalories": 600, "allergens": []}
+    with patch("main._calculate_custom_box", new=AsyncMock(return_value=preview)):
+        action = {"type": "set_purchase", "mode": "one_time"}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state["purchaseType"] == "one_time"
+    assert resp["flowState"] == main.BB_CONFIRM
+    assert resp["priceInfo"]["totalPrice"] == 162
+    assert any(q["action"].get("type") == "confirm" for q in resp["quickActions"])
+
+
+@pytest.mark.asyncio
+async def test_bb_confirm_one_time_creates_box_and_cart():
+    def side(tool, args, token, lang):
+        if tool == "create_custom_box":
+            return {"success": True, "boxId": "box_1", "name": "Custom", "price": 162}
+        if tool == "add_to_cart":
+            return {"success": True, "cartTotal": 162}
+        return {}
+    state = {"step": main.BB_CONFIRM, "servingSize": 2, "purchaseType": "one_time",
+             "priceInfo": {"totalPrice": 162},
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    with patch("main.execute_tool", new=AsyncMock(side_effect=side)):
+        action = {"type": "confirm"}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state is None  # flow ended → lock released
+    assert resp["flow"] is None
+    names = [tc["tool"] for tc in resp["toolCalls"]]
+    assert "create_custom_box" in names and "add_to_cart" in names
+
+
+@pytest.mark.asyncio
+async def test_bb_confirm_subscription_creates_box_and_subscription():
+    def side(tool, args, token, lang):
+        if tool == "create_custom_box":
+            return {"success": True, "boxId": "box_1"}
+        if tool == "create_subscription":
+            return {"success": True, "subscriptionId": "sub_1"}
+        return {}
+    state = {"step": main.BB_CONFIRM, "servingSize": 4, "purchaseType": "weekly",
+             "priceInfo": {"totalPrice": 288},
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    with patch("main.execute_tool", new=AsyncMock(side_effect=side)):
+        action = {"type": "confirm"}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state is None
+    names = [tc["tool"] for tc in resp["toolCalls"]]
+    assert "create_custom_box" in names and "create_subscription" in names
+
+
+@pytest.mark.asyncio
+async def test_bb_confirm_requires_login():
+    state = {"step": main.BB_CONFIRM, "servingSize": 2, "purchaseType": "one_time",
+             "priceInfo": {"totalPrice": 162},
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    # No user_token → must not create anything, stays at CONFIRM
+    with patch("main.execute_tool", new=AsyncMock()) as exec_mock:
+        action = {"type": "confirm"}
+        resp, state = await main.handle_custom_box_flow(
+            main.ChatRequest(message="", session_id="bb", user_token=None, flow="custom_box", action=action),
+            "bb", None, "en", state, action)
+    assert state is not None and state["step"] == main.BB_CONFIRM
+    exec_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bb_cancel_ends_flow():
+    state = {"step": main.BB_SELECTING, "dietFilter": "all", "menu": MENU,
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    action = {"type": "cancel"}
+    resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state is None
+    assert resp["flow"] is None
 
