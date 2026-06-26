@@ -841,16 +841,17 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
                                 except Exception:
                                     pass
                         query_filter["_id"] = {"$in": match_ids}
+                    limit_val = 200 if args.get("mealIds") else 20
                     meals = await db.meals.find(query_filter, {
                         "_id": 1, "name": 1, "description": 1, "dietType": 1,
                         "pricePerServing": 1, "caloriesPerServing": 1, "allergens": 1
-                    }).to_list(length=200)
+                    }).to_list(length=limit_val)
                     return {
                         "meals": [
                             {
                                 "id": str(m["_id"]),
                                 "name": m.get("name"),
-                                "description": m.get("description", ""),
+                                "description": "",
                                 "dietType": m.get("dietType"),
                                 "price": m.get("pricePerServing"),
                                 "calories": m.get("caloriesPerServing"),
@@ -1062,10 +1063,11 @@ class ChatRequest(BaseModel):
 
 async def groq_generate_with_retry(messages, model_id, max_retries=3):
     """Call Groq with exponential backoff on rate-limit or transient errors."""
+    current_model = model_id
     for attempt in range(max_retries):
         try:
             response = await groq_client.chat.completions.create(
-                model=model_id,
+                model=current_model,
                 messages=messages,
                 tools=TOOL_DECLARATIONS,
                 tool_choice="auto",
@@ -1075,6 +1077,23 @@ async def groq_generate_with_retry(messages, model_id, max_retries=3):
             return response
         except Exception as e:
             error_str = str(e).lower()
+            if ("429" in error_str or "rate_limit" in error_str) and current_model == "llama-3.3-70b-versatile":
+                print(f"⚠️ Rate limit hit on {current_model}. Falling back to llama-3.1-8b-instant.")
+                current_model = "llama-3.1-8b-instant"
+                try:
+                    response = await groq_client.chat.completions.create(
+                        model=current_model,
+                        messages=messages,
+                        tools=TOOL_DECLARATIONS,
+                        tool_choice="auto",
+                        temperature=0.0,
+                        max_tokens=800,
+                    )
+                    return response
+                except Exception as inner_e:
+                    e = inner_e
+                    error_str = str(e).lower()
+                    
             is_retryable = any(keyword in error_str for keyword in [
                 "429", "rate_limit", "503", "unavailable", "500", "internal"
             ])
