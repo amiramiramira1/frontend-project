@@ -341,16 +341,15 @@ def search_faq(query: str, language: str = "ar") -> Optional[str]:
     return None
 
 
-def classify_intent(query: str, language: str = "ar") -> str:
-    """Classify user query as 'faq', 'recommendation', or 'other' using BM25 max-score voting."""
+def _bm25_intent_scores(query: str, language: str = "ar") -> tuple[float, float]:
     _ensure_indices_built()
     if not intent_faq_items or not intent_rec_items or intent_bm25_faq_ar is None:
-        return 'other'
+        return 0.0, 0.0
         
     q_norm = normalize_text(query, language)
     q_tokens = [w for w in q_norm.split() if w not in STOP_WORDS]
     if not q_tokens:
-        return 'other'
+        return 0.0, 0.0
 
     if language == 'en':
         faq_score = float(intent_bm25_faq_en.get_scores(q_tokens).max())
@@ -358,13 +357,123 @@ def classify_intent(query: str, language: str = "ar") -> str:
     else:
         faq_score = float(intent_bm25_faq_ar.get_scores(q_tokens).max())
         rec_score = float(intent_bm25_rec_ar.get_scores(q_tokens).max())
+    return faq_score, rec_score
 
-    # INTENT_THRESHOLD prevents weak matches from being misrouted
-    INTENT_THRESHOLD = 1.0 if len(dataset) > 10 else 0.01
-    if max(faq_score, rec_score) < INTENT_THRESHOLD:
-        return 'other'
 
-    return 'faq' if faq_score >= rec_score else 'recommendation'
+CUSTOM_BOX_KEYWORDS = [
+    "custom box", "build my own", "build my box", "choose my meals", "pick meals",
+    "make my own box", "create a custom", "my own box", "meal ids", "meal_id",
+    "build a box", "customize my box", "بوكس مخصص", "ابني بوكس", "اختار وجبات",
+    "اختار اكل", "وجباتي", "علبة مخصصة",
+]
+RECOMMENDATION_KEYWORDS = [
+    "recommend", "suggest", "best box", "good box", "box for", "pre-made",
+    "premade", "ready box", "which box", "اقتراح", "رشح", "ترشح", "انصح", "بوكس مناسب",
+]
+FAQ_KEYWORDS = [
+    "policy", "refund", "cancel", "cancellation", "delivery", "shipping", "payment",
+    "price", "pricing", "subscription", "account", "order", "minimum order",
+    "سياسة", "استرداد", "الغاء", "إلغاء", "توصيل", "دفع", "سعر", "اشتراك", "طلب",
+]
+DIALOGUE_KEYWORDS = [
+    "hi", "hello", "hey", "thanks", "thank you", "joke", "how are you",
+    "مرحبا", "اهلا", "أهلا", "شكرا", "عامل ايه",
+]
+
+
+def _has_any(text: str, keywords: list[str]) -> bool:
+    return any(keyword in text for keyword in keywords)
+
+
+def _has_custom_box_context(history: list | None) -> bool:
+    if not history:
+        return False
+    recent = " ".join(str(msg.get("content", "")) for msg in history[-8:]).lower()
+    return _has_any(recent, CUSTOM_BOX_KEYWORDS) or any(
+        (msg.get("toolCall") or {}).get("name") in {"get_available_meals", "create_custom_box"}
+        for msg in history[-8:]
+    )
+
+
+def determine_next_mode(query: str, language: str = "ar", current_mode: str | None = None) -> tuple[str, float, str]:
+    """Determine the next chatbot mode based on query, language, and the active session mode."""
+    q = (query or "").strip()
+    if not q:
+        return "dialogue", 0.0, "empty_message"
+
+    text = q.lower()
+    faq_score, rec_score = _bm25_intent_scores(q, language)
+    threshold = 1.0 if len(dataset) > 10 else 0.01
+
+    custom_hit = _has_any(text, CUSTOM_BOX_KEYWORDS) or bool(re.search(r"\bmeal[_-]?[a-z0-9]+\b", text))
+    rec_hit = _has_any(text, RECOMMENDATION_KEYWORDS)
+    faq_hit = _has_any(text, FAQ_KEYWORDS)
+    dialogue_hit = _has_any(text, DIALOGUE_KEYWORDS)
+
+    detected_mode = None
+    confidence = 0.0
+    reason = ""
+
+    if custom_hit:
+        detected_mode = "custom_box"
+        confidence = 0.92
+        reason = "custom_box_keywords"
+    elif rec_hit and (rec_score >= faq_score or not faq_hit):
+        score_val = rec_score / (rec_score + 1) if rec_score > 0 else 0.0
+        detected_mode = "recommendation"
+        confidence = max(0.78, min(0.98, score_val))
+        reason = "recommendation_keywords"
+    elif faq_hit and (faq_score >= rec_score or not rec_hit):
+        score_val = faq_score / (faq_score + 1) if faq_score > 0 else 0.0
+        detected_mode = "faq"
+        confidence = max(0.75, min(0.98, score_val))
+        reason = "faq_keywords"
+    elif max(faq_score, rec_score) >= threshold:
+        if faq_score >= rec_score:
+            detected_mode = "faq"
+            confidence = min(0.95, faq_score / (faq_score + 1))
+            reason = "bm25_faq"
+        else:
+            detected_mode = "recommendation"
+            confidence = min(0.95, rec_score / (rec_score + 1))
+            reason = "bm25_recommendation"
+    elif dialogue_hit or len(text.split()) <= 3:
+        detected_mode = "dialogue"
+        confidence = 0.55
+        reason = "dialogue_or_short_message"
+    else:
+        detected_mode = "dialogue"
+        confidence = 0.45
+        reason = "fallback_dialogue"
+
+    # State transition:
+    # Allow strong new intents to interrupt, but keep weak/ambiguous dialogue within current active mode.
+    if current_mode in ("custom_box", "recommendation"):
+        is_strong_new_intent = (
+            (detected_mode == "faq" and (faq_hit or faq_score >= 8.0)) or
+            (detected_mode == "recommendation" and (rec_hit or rec_score >= 8.0)) or
+            (detected_mode == "custom_box" and (custom_hit or bool(re.search(r"\bmeal[_-]?[a-z0-9]+\b", text))))
+        )
+        if not is_strong_new_intent:
+            return current_mode, 0.85, f"continue_{current_mode}_session"
+
+    return detected_mode, confidence, reason
+
+
+def classify_chat_mode(query: str, language: str = "ar", history: list | None = None) -> dict:
+    """Return a structured routing decision for faq, recommendation, custom_box, or dialogue."""
+    current_mode = None
+    if history:
+        if _has_custom_box_context(history):
+            current_mode = "custom_box"
+    mode, confidence, reason = determine_next_mode(query, language, current_mode)
+    return {"mode": mode, "confidence": round(float(confidence), 3), "reason": reason}
+
+
+def classify_intent(query: str, language: str = "ar") -> str:
+    """Classify user query as 'faq', 'recommendation', or 'other' using BM25 max-score voting."""
+    mode, confidence, reason = determine_next_mode(query, language)
+    return mode if mode in ("faq", "recommendation") else "other"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -720,6 +829,18 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
                     query_filter = {}
                     if args.get("dietType"):
                         query_filter["dietType"] = args["dietType"].lower().strip()
+                    if args.get("mealIds"):
+                        from bson import ObjectId
+                        match_ids = []
+                        for m_id in args["mealIds"]:
+                            match_ids.append(m_id)
+                            clean_id = m_id.replace("meal-", "").replace("meal_", "").replace("meal", "")
+                            if len(clean_id) == 24:
+                                try:
+                                    match_ids.append(ObjectId(clean_id))
+                                except Exception:
+                                    pass
+                        query_filter["_id"] = {"$in": match_ids}
                     meals = await db.meals.find(query_filter, {
                         "_id": 1, "name": 1, "description": 1, "dietType": 1,
                         "pricePerServing": 1, "caloriesPerServing": 1, "allergens": 1
@@ -815,6 +936,36 @@ async def get_session_history(session_id: str) -> list:
     if not session:
         return []
     return session.get("messages", [])
+
+
+async def get_session_mode(session_id: str) -> Optional[str]:
+    """Retrieve the current active mode for the session from MongoDB."""
+    if db is None:
+        return None
+    session = await db.chat_sessions.find_one({"sessionId": session_id})
+    if not session:
+        return None
+    return session.get("currentMode")
+
+
+async def save_session_mode(session_id: str, mode: str):
+    """Save the active mode for the session in MongoDB."""
+    if db is None:
+        return
+    now = datetime.now(timezone.utc)
+    await db.chat_sessions.update_one(
+        {"sessionId": session_id},
+        {
+            "$set": {
+                "currentMode": mode,
+                "updatedAt": now,
+            },
+            "$setOnInsert": {
+                "createdAt": now,
+            }
+        },
+        upsert=True
+    )
 
 
 async def save_session_message(session_id: str, role: str, content: str, user_id: str = None,
@@ -943,6 +1094,124 @@ def root():
     return {"message": "Boxify AI Service v2.0 🥕", "model": MODEL_ID}
 
 
+def _build_messages(history: list, user_message: str | None = None, mode: str | None = None) -> list:
+    system = SYSTEM_PROMPT
+    if mode:
+        system += f"\n\nROUTER MODE: {mode}. Follow this mode unless the user clearly changes intent."
+    messages = [{"role": "system", "content": system}]
+    for msg in history[-10:]:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "user":
+            messages.append({"role": "user", "content": content})
+        elif role == "model":
+            messages.append({"role": "assistant", "content": content})
+    if user_message is not None:
+        messages.append({"role": "user", "content": user_message})
+    return messages
+
+
+async def _run_react_loop(messages: list, sid: str, user_token: str | None, lang: str,
+                          model_id: str, tool_calls_made: list | None = None,
+                          mode: str = "dialogue", confidence: float = 0.0) -> dict:
+    tool_calls_made = tool_calls_made or []
+    for _ in range(5):
+        response = await groq_generate_with_retry(messages, model_id)
+        assistant_msg = response.choices[0].message
+        tool_calls = assistant_msg.tool_calls
+
+        if not tool_calls:
+            answer = assistant_msg.content or ""
+            if not answer.strip():
+                answer = "Sorry, I couldn't process that. Could you rephrase?"
+            await save_session_message(sid, "model", answer)
+            return {
+                "answer": answer,
+                "source": "groq",
+                "toolCalls": tool_calls_made,
+                "model": model_id,
+                "mode": mode,
+                "modeConfidence": confidence,
+            }
+
+        messages.append(assistant_msg)
+        for tool_call in tool_calls:
+            tool_name = tool_call.function.name
+            tool_args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
+            result = await execute_tool(tool_name, tool_args, user_token, lang)
+            tool_calls_made.append({"tool": tool_name, "args": tool_args, "result": result})
+            await save_session_message(
+                sid,
+                "tool",
+                json.dumps(result, default=str),
+                tool_call={"name": tool_name, "args": tool_args},
+            )
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "name": tool_name,
+                "content": json.dumps(result, default=str),
+            })
+
+    return {
+        "answer": "I'm having trouble processing your request. Could you try again?",
+        "source": "error",
+        "toolCalls": tool_calls_made,
+        "model": model_id,
+        "mode": mode,
+        "modeConfidence": confidence,
+    }
+
+
+async def _prefetch_tool_then_narrate(tool_name: str, tool_args: dict, tool_result: dict,
+                                      history: list, sid: str, req_message: str,
+                                      user_token: str | None, lang: str, model_id: str,
+                                      mode: str, confidence: float) -> dict:
+    await save_session_message(sid, "user", req_message)
+    messages = _build_messages(history, mode=mode)
+    simulated_tool_call_id = "call_" + "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=10))
+    messages.append({
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [{
+            "id": simulated_tool_call_id,
+            "type": "function",
+            "function": {"name": tool_name, "arguments": json.dumps(tool_args)},
+        }],
+    })
+    messages.append({
+        "role": "tool",
+        "tool_call_id": simulated_tool_call_id,
+        "name": tool_name,
+        "content": json.dumps(tool_result, default=str),
+    })
+    await save_session_message(
+        sid,
+        "tool",
+        json.dumps(tool_result, default=str),
+        tool_call={"name": tool_name, "args": tool_args},
+    )
+    return await _run_react_loop(
+        messages,
+        sid,
+        user_token,
+        lang,
+        model_id,
+        [{"tool": tool_name, "args": tool_args, "result": tool_result}],
+        mode,
+        confidence,
+    )
+
+
+def _standard_boxify_dialogue(req_message: str, lang: str) -> Optional[str]:
+    lower = req_message.lower().strip()
+    if any(word in lower for word in ["joke", "football", "weather", "movie"]) or "نكتة" in req_message:
+        if lang == "ar":
+            return "أقدر أساعدك في أسئلة Boxify والأكل والطلبات فقط. تحب أرشح لك بوكس مناسب؟"
+        return "I can help with Boxify food, boxes, orders, and subscriptions. Want me to recommend a meal box instead?"
+    return None
+
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
@@ -952,12 +1221,18 @@ async def chat(req: ChatRequest):
 
         # Auto-detect language from the user's message
         lang = detect_language(req.message)
+        history = await get_session_history(sid)
+
+        # Load session mode, determine next mode, and save it
+        current_mode = await get_session_mode(sid)
+        mode, confidence, reason = determine_next_mode(req.message, lang, current_mode)
+        await save_session_mode(sid, mode)
 
         # ── Intent Router (Phase 3) ───────────────────────────────────────────
         is_testing = "PYTEST_CURRENT_TEST" in os.environ and not getattr(sys.modules[__name__], "FORCE_FAST_PATH", False)
         
         if not is_testing:
-            intent = classify_intent(req.message, lang)
+            intent = mode
             
             # FAQ fast path: skip Gemini entirely for clear FAQ matches
             if intent == 'faq':
@@ -970,6 +1245,8 @@ async def chat(req: ChatRequest):
                         "source": "bm25_faq",
                         "toolCalls": [],
                         "model": model_id,
+                        "mode": mode,
+                        "modeConfidence": confidence,
                     }
                     
             # Recommendation fast path: pre-fetch recommend_box and feed to Gemini in a single turn
@@ -978,6 +1255,12 @@ async def chat(req: ChatRequest):
                 rec_args = {}
                 if diet_hint:
                     rec_args["dietType"] = diet_hint
+                preferences = _extract_preferences(req.message)
+                if preferences:
+                    rec_args["preferences"] = preferences
+                max_price = preferences.get("maxPrice") if preferences else None
+                if max_price:
+                    rec_args["maxPrice"] = max_price
                     
                 rec_result = await execute_tool("recommend_box", rec_args, user_token, lang)
                 
@@ -986,16 +1269,7 @@ async def chat(req: ChatRequest):
                 
                 # Build conversation history
                 history = await get_session_history(sid)
-                messages = [
-                    {"role": "system", "content": SYSTEM_PROMPT}
-                ]
-                for msg in history[-10:]:
-                    role = msg.get("role", "user")
-                    content = msg.get("content", "")
-                    if role == "user":
-                        messages.append({"role": "user", "content": content})
-                    elif role == "model":
-                        messages.append({"role": "assistant", "content": content})
+                messages = _build_messages(history, mode=mode)
                         
                 # Append pre-fetched tool interaction directly to messages
                 simulated_tool_call_id = "call_" + "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=10))
@@ -1025,65 +1299,69 @@ async def chat(req: ChatRequest):
                                      tool_call={"name": "recommend_box", "args": rec_args})
                                      
                 # Now invoke the ReAct loop directly, which will generate the final narration
-                max_iterations = 5
-                tool_calls_made = [{
-                    "tool": "recommend_box",
-                    "args": rec_args,
-                    "result": rec_result,
-                }]
-                
-                for iteration in range(max_iterations):
-                    response = await groq_generate_with_retry(messages, model_id)
-                    assistant_msg = response.choices[0].message
-                    tool_calls = assistant_msg.tool_calls
+                return await _run_react_loop(
+                    messages,
+                    sid,
+                    user_token,
+                    lang,
+                    model_id,
+                    [{"tool": "recommend_box", "args": rec_args, "result": rec_result}],
+                    mode,
+                    confidence,
+                )
 
-                    if not tool_calls:
-                        answer = assistant_msg.content or ""
-                        if not answer.strip():
-                            answer = "Sorry, I couldn't process that. Could you rephrase?"
+            elif intent == 'custom_box':
+                tool_name, tool_args = _custom_box_prefetch_args(req.message)
+                tool_result = await execute_tool(tool_name, tool_args, user_token, lang)
+                result = await _prefetch_tool_then_narrate(
+                    tool_name,
+                    tool_args,
+                    tool_result,
+                    history,
+                    sid,
+                    req.message,
+                    user_token,
+                    lang,
+                    model_id,
+                    mode,
+                    confidence,
+                )
+                if tool_name == "create_custom_box":
+                    frequency = _extract_frequency(req.message)
+                    serving_size = _extract_serving_size(req.message)
+                    box_id = tool_result.get("boxId") if isinstance(tool_result, dict) else None
+                    if box_id and serving_size:
+                        if frequency:
+                            sub_args = {"boxId": box_id, "servingSize": serving_size, "frequency": frequency}
+                            sub_result = await execute_tool("create_subscription", sub_args, user_token, lang)
+                            result.setdefault("toolCalls", []).append({
+                                "tool": "create_subscription",
+                                "args": sub_args,
+                                "result": sub_result,
+                            })
+                        else:
+                            cart_args = {"boxId": box_id, "servingSize": serving_size, "quantity": 1}
+                            cart_result = await execute_tool("add_to_cart", cart_args, user_token, lang)
+                            result.setdefault("toolCalls", []).append({
+                                "tool": "add_to_cart",
+                                "args": cart_args,
+                                "result": cart_result,
+                            })
+                return result
 
-                        await save_session_message(sid, "model", answer)
-
-                        return {
-                            "answer": answer,
-                            "source": "groq",
-                            "toolCalls": tool_calls_made,
-                            "model": model_id,
-                        }
-
-                    messages.append(assistant_msg)
-
-                    for tool_call in tool_calls:
-                        tool_name = tool_call.function.name
-                        tool_args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
-
-                        print(f"🔧 Tool call: {tool_name}({json.dumps(tool_args, default=str)})")
-
-                        result = await execute_tool(tool_name, tool_args, user_token, lang)
-                        tool_calls_made.append({
-                            "tool": tool_name,
-                            "args": tool_args,
-                            "result": result,
-                        })
-
-                        print(f"✅ Tool result: {json.dumps(result, default=str)[:200]}")
-
-                        await save_session_message(sid, "tool", json.dumps(result, default=str),
-                                             tool_call={"name": tool_name, "args": tool_args})
-
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "name": tool_name,
-                            "content": json.dumps(result, default=str),
-                        })
-
-                return {
-                    "answer": "I'm having trouble processing your request. Could you try again?",
-                    "source": "error",
-                    "toolCalls": tool_calls_made,
-                    "model": model_id,
-                }
+            elif intent == 'dialogue':
+                direct_answer = _standard_boxify_dialogue(req.message, lang)
+                if direct_answer:
+                    await save_session_message(sid, "user", req.message)
+                    await save_session_message(sid, "model", direct_answer)
+                    return {
+                        "answer": direct_answer,
+                        "source": "groq",
+                        "toolCalls": [],
+                        "model": model_id,
+                        "mode": mode,
+                        "modeConfidence": confidence,
+                    }
 
         # Build conversation history from MongoDB (Standard ReAct path)
         history = await get_session_history(sid)
@@ -1128,11 +1406,12 @@ async def chat(req: ChatRequest):
                     "source": "groq",
                     "toolCalls": tool_calls_made,
                     "model": model_id,
+                    "mode": mode,
+                    "modeConfidence": confidence,
                 }
 
             # Process function calls
             # Add the model's response (with function calls) to history
-            # For Groq, the assistant message object can be appended directly or as dict
             messages.append(assistant_msg)
 
             # Execute each function call and build response parts
@@ -1170,6 +1449,8 @@ async def chat(req: ChatRequest):
             "source": "error",
             "toolCalls": tool_calls_made,
             "model": model_id,
+            "mode": mode,
+            "modeConfidence": confidence,
         }
 
     except Exception as e:
@@ -1177,11 +1458,21 @@ async def chat(req: ChatRequest):
         import traceback
         traceback.print_exc()
 
+        mode_val = locals().get("mode", "dialogue")
+        conf_val = locals().get("confidence", 0.0)
+
         # Attempt FAQ fallback for simple questions
         try:
             faq_answer = search_faq(req.message, detect_language(req.message))
             if faq_answer:
-                return {"answer": faq_answer, "source": "faq_fallback", "toolCalls": [], "model": model_id}
+                return {
+                    "answer": faq_answer,
+                    "source": "faq_fallback",
+                    "toolCalls": [],
+                    "model": model_id,
+                    "mode": mode_val,
+                    "modeConfidence": conf_val,
+                }
         except Exception:
             pass
 
@@ -1189,6 +1480,8 @@ async def chat(req: ChatRequest):
             "answer": "I'm experiencing high demand right now. Please try again in a moment! 😊",
             "source": "error",
             "model": model_id,
+            "mode": mode_val,
+            "modeConfidence": conf_val,
         }
 
 
@@ -1213,3 +1506,79 @@ def _extract_diet_hint(text: str) -> Optional[str]:
         if any(kw in text_lower for kw in keywords):
             return diet
     return None
+
+
+def _extract_price_hint(text: str) -> Optional[float]:
+    lower = text.lower()
+    match = re.search(r"(?:under|below|less than|max(?:imum)?|budget|حد اقصى|اقل من|تحت)\s*(\d{2,5})", lower)
+    if not match:
+        match = re.search(r"(\d{2,5})\s*(?:egp|جنيه)", lower)
+    return float(match.group(1)) if match else None
+
+
+def _extract_preferences(text: str) -> dict:
+    prefs = {}
+    diet = _extract_diet_hint(text)
+    if diet:
+        prefs["dietTypes"] = [diet]
+
+    lower = text.lower()
+    allergens = []
+    for allergen in ALLERGENS:
+        if (
+            f"free of {allergen}" in lower
+            or f"without {allergen}" in lower
+            or f"no {allergen}" in lower
+            or f"{allergen}-free" in lower
+        ):
+            allergens.append(allergen)
+    if "مكسرات" in lower:
+        allergens.append("nuts")
+    if "البان" in lower or "ألبان" in text:
+        allergens.append("dairy")
+    if allergens:
+        prefs["allergens"] = sorted(set(allergens))
+
+    max_price = _extract_price_hint(text)
+    if max_price:
+        prefs["maxPrice"] = max_price
+    if any(word in lower for word in ["light", "healthy", "low calorie", "low-calorie", "خفيف", "صحي"]):
+        prefs["wantsLight"] = True
+    return prefs
+
+
+def _extract_meal_ids(text: str) -> list[str]:
+    return re.findall(r"\bmeal[_-]?[a-z0-9]+\b", text.lower())
+
+
+def _extract_serving_size(text: str) -> Optional[int]:
+    match = re.search(r"\b(1|2|4|6)\s*(?:people|person|servings?|افراد|أفراد|اشخاص|أشخاص)?\b", text.lower())
+    return int(match.group(1)) if match else None
+
+
+def _extract_frequency(text: str) -> Optional[str]:
+    lower = text.lower()
+    if "weekly" in lower or "اسبوع" in lower or "أسبوع" in text:
+        return "weekly"
+    if "monthly" in lower or "شهري" in lower:
+        return "monthly"
+    return None
+
+
+def _has_confirmation(text: str) -> bool:
+    lower = text.lower()
+    return any(word in lower for word in ["confirm", "go ahead", "create", "yes", "تمام", "اكد", "أكد", "اعمل"])
+
+
+def _custom_box_prefetch_args(req_message: str) -> tuple[str, dict]:
+    meal_ids = _extract_meal_ids(req_message)
+    if meal_ids:
+        if _has_confirmation(req_message):
+            return "create_custom_box", {"mealIds": meal_ids}
+        else:
+            return "get_available_meals", {"mealIds": meal_ids}
+    args = {}
+    diet = _extract_diet_hint(req_message)
+    if diet:
+        args["dietType"] = diet
+    return "get_available_meals", args

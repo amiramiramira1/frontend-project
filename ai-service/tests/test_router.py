@@ -191,3 +191,342 @@ async def test_chat_faq_fast_path():
         assert mock_save.call_count == 2
         
     main.FORCE_FAST_PATH = False
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. State-Aware Router Unit Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_determine_next_mode_custom_box_english():
+    mode, confidence, reason = main.determine_next_mode("build my own box", "en")
+    assert mode == "custom_box"
+    assert confidence >= 0.9
+
+def test_determine_next_mode_custom_box_arabic():
+    mode, confidence, reason = main.determine_next_mode("ابني بوكس مخصص", "ar")
+    assert mode == "custom_box"
+    assert confidence >= 0.9
+
+def test_determine_next_mode_dialogue():
+    mode, confidence, reason = main.determine_next_mode("hello Chef", "en")
+    assert mode == "dialogue"
+
+def test_determine_next_mode_continuation():
+    # Weak input keeps active custom_box mode
+    mode, confidence, reason = main.determine_next_mode("make it for 2 people", "en", current_mode="custom_box")
+    assert mode == "custom_box"
+    assert reason == "continue_custom_box_session"
+
+def test_determine_next_mode_interruption():
+    # Strong FAQ interrupts custom_box mode
+    mode, confidence, reason = main.determine_next_mode("what is your refund policy", "en", current_mode="custom_box")
+    assert mode == "faq"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. /chat Router Integration Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_chat_recommendation_prefetch_path():
+    main.FORCE_FAST_PATH = True
+    
+    mock_db = MagicMock()
+    mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
+    
+    rec_result = {
+        "boxes": [{"id": "b1", "name": "Keto Box", "price": 200, "meals": ["Chicken"]}],
+        "count": 1
+    }
+    
+    # We mock groq completions to return the final narration directly
+    mock_completion = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = "Here is the Keto Box recommendation."
+    mock_choice.message.tool_calls = None
+    mock_completion.choices = [mock_choice]
+    
+    with patch("main.db", mock_db), \
+         patch("main.execute_tool", new=AsyncMock(return_value=rec_result)), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()), \
+         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
+         
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            resp = await client.post("/chat", json={
+                "message": "recommend a healthy keto box",
+                "sessionId": "rec-test"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "recommendation"
+        assert body["source"] == "groq"
+        assert "Keto Box" in body["answer"] or "recommendation" in body["answer"]
+        assert len(body["toolCalls"]) == 1
+        assert body["toolCalls"][0]["tool"] == "recommend_box"
+        
+    main.FORCE_FAST_PATH = False
+
+
+@pytest.mark.asyncio
+async def test_chat_custom_box_start_path():
+    main.FORCE_FAST_PATH = True
+    
+    mock_db = MagicMock()
+    mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
+    
+    meals_result = {"meals": [{"id": "m1", "name": "Steak", "price": 90}], "count": 1}
+    
+    mock_completion = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = "I found these meals: Steak. What serving size do you want?"
+    mock_choice.message.tool_calls = None
+    mock_completion.choices = [mock_choice]
+    
+    with patch("main.db", mock_db), \
+         patch("main.execute_tool", new=AsyncMock(return_value=meals_result)), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()), \
+         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
+         
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            resp = await client.post("/chat", json={
+                "message": "build a custom box",
+                "sessionId": "custom-start-test"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "custom_box"
+        assert len(body["toolCalls"]) == 1
+        assert body["toolCalls"][0]["tool"] == "get_available_meals"
+        
+    main.FORCE_FAST_PATH = False
+
+
+@pytest.mark.asyncio
+async def test_chat_custom_box_creation_and_cart():
+    main.FORCE_FAST_PATH = True
+    
+    mock_db = MagicMock()
+    mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
+    
+    def side_effect(tool_name, args, token, lang):
+        if tool_name == "create_custom_box":
+            return {"success": True, "boxId": "box_123"}
+        elif tool_name == "add_to_cart":
+            return {"success": True, "message": "Added to cart"}
+        return {}
+        
+    mock_completion = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = "Your custom box is created and added to cart!"
+    mock_choice.message.tool_calls = None
+    mock_completion.choices = [mock_choice]
+    
+    with patch("main.db", mock_db), \
+         patch("main.execute_tool", new=AsyncMock(side_effect=side_effect)), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()), \
+         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
+         
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            resp = await client.post("/chat", json={
+                "message": "create box using meal_a and meal_b for 2 people. I confirm - go ahead.",
+                "sessionId": "custom-cart-test",
+                "userToken": "mock_token"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "custom_box"
+        # Tool calls should include create_custom_box and add_to_cart
+        tool_names = [tc["tool"] for tc in body["toolCalls"]]
+        assert "create_custom_box" in tool_names
+        assert "add_to_cart" in tool_names
+        
+    main.FORCE_FAST_PATH = False
+
+
+@pytest.mark.asyncio
+async def test_chat_custom_box_creation_and_subscription():
+    main.FORCE_FAST_PATH = True
+    
+    mock_db = MagicMock()
+    mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
+    
+    def side_effect(tool_name, args, token, lang):
+        if tool_name == "create_custom_box":
+            return {"success": True, "boxId": "box_123"}
+        elif tool_name == "create_subscription":
+            return {"success": True, "message": "Subscription created"}
+        return {}
+        
+    mock_completion = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = "Your custom box subscription is created!"
+    mock_choice.message.tool_calls = None
+    mock_completion.choices = [mock_choice]
+    
+    with patch("main.db", mock_db), \
+         patch("main.execute_tool", new=AsyncMock(side_effect=side_effect)), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()), \
+         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
+         
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            resp = await client.post("/chat", json={
+                "message": "create box using meal_a and meal_b weekly for 4 people. I confirm - go ahead.",
+                "sessionId": "custom-sub-test",
+                "userToken": "mock_token"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "custom_box"
+        tool_names = [tc["tool"] for tc in body["toolCalls"]]
+        assert "create_custom_box" in tool_names
+        assert "create_subscription" in tool_names
+        
+    main.FORCE_FAST_PATH = False
+
+
+@pytest.mark.asyncio
+async def test_chat_dialogue_fallback_no_tool_calls():
+    main.FORCE_FAST_PATH = True
+    
+    mock_db = MagicMock()
+    mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
+    
+    with patch("main.db", mock_db), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()):
+         
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            resp = await client.post("/chat", json={
+                "message": "greetings Chef! tell me a joke.",
+                "sessionId": "dialogue-test"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "dialogue"
+        assert body["toolCalls"] == []
+        assert "أقدر أساعدك" in body["answer"] or "recommend a meal box" in body["answer"]
+        
+    main.FORCE_FAST_PATH = False
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. Mode Switching & Interruptions Tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_chat_switching_faq_interrupts_custom_box():
+    main.FORCE_FAST_PATH = True
+    
+    mock_data = [
+        {
+            "question_en": "what is the refund policy",
+            "question_ar": "سياسة الاسترداد",
+            "intent": "faq",
+            "answer": "Full refund within 14 days.",
+            "answer_ar": "استرداد كامل خلال ١٤ يوم."
+        }
+    ]
+    
+    mock_db = MagicMock()
+    # Mocking get_session_mode to return 'custom_box'
+    mock_db.chat_sessions.find_one = AsyncMock(return_value={"currentMode": "custom_box"})
+    
+    with patch("main.dataset", mock_data), \
+         patch("main.db", mock_db), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()) as mock_save_mode:
+         
+        main._ensure_indices_built()
+        
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            resp = await client.post("/chat", json={
+                "message": "what is the refund policy",
+                "sessionId": "switch-faq-test"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "faq"
+        assert body["source"] == "bm25_faq"
+        mock_save_mode.assert_called_with("switch-faq-test", "faq")
+        
+    main.FORCE_FAST_PATH = False
+
+
+@pytest.mark.asyncio
+async def test_chat_switching_recommendation_interrupts_custom_box():
+    main.FORCE_FAST_PATH = True
+    
+    mock_db = MagicMock()
+    mock_db.chat_sessions.find_one = AsyncMock(return_value={"currentMode": "custom_box"})
+    
+    rec_result = {"boxes": [], "count": 0}
+    mock_completion = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = "Recommendation narration"
+    mock_choice.message.tool_calls = None
+    mock_completion.choices = [mock_choice]
+    
+    with patch("main.db", mock_db), \
+         patch("main.execute_tool", new=AsyncMock(return_value=rec_result)), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()) as mock_save_mode, \
+         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
+         
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            resp = await client.post("/chat", json={
+                "message": "actually recommend a keto box",
+                "sessionId": "switch-rec-test"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "recommendation"
+        mock_save_mode.assert_called_with("switch-rec-test", "recommendation")
+        
+    main.FORCE_FAST_PATH = False
+
+
+@pytest.mark.asyncio
+async def test_chat_switching_continuation_in_custom_box():
+    main.FORCE_FAST_PATH = True
+    
+    mock_db = MagicMock()
+    mock_db.chat_sessions.find_one = AsyncMock(return_value={"currentMode": "custom_box"})
+    
+    meals_result = {"meals": [], "count": 0}
+    mock_completion = MagicMock()
+    mock_choice = MagicMock()
+    mock_choice.message.content = "Steak box details"
+    mock_choice.message.tool_calls = None
+    mock_completion.choices = [mock_choice]
+    
+    with patch("main.db", mock_db), \
+         patch("main.execute_tool", new=AsyncMock(return_value=meals_result)), \
+         patch("main.save_session_message", new=AsyncMock()), \
+         patch("main.save_session_mode", new=AsyncMock()) as mock_save_mode, \
+         patch("main.groq_generate_with_retry", new=AsyncMock(return_value=mock_completion)):
+         
+        async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+            # Weak filler query should continue in custom_box
+            resp = await client.post("/chat", json={
+                "message": "make it weekly for 2 people",
+                "sessionId": "switch-cont-test"
+            })
+            
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "custom_box"
+        mock_save_mode.assert_called_with("switch-cont-test", "custom_box")
+        
+    main.FORCE_FAST_PATH = False
+
