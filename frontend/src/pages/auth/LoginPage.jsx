@@ -90,10 +90,11 @@ export default function LoginPage() {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t('login.emailLabel')}
               </label>
               <input
+                id="login-email"
                 type="email"
                 required
                 value={form.email}
@@ -105,11 +106,12 @@ export default function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t('login.passwordLabel')}
               </label>
               <div className="relative">
                 <input
+                  id="login-password"
                   type="text"
                   style={{ WebkitTextSecurity: showPw ? 'none' : 'disc' }}
                   required
