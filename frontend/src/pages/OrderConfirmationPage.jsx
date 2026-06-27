@@ -6,7 +6,7 @@ import { generateReceipt } from '../utils/generateReceipt';
 import { useTranslation } from 'react-i18next';
 
 export default function OrderConfirmationPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { state } = useLocation();
   const navigate = useNavigate();
   const order = state?.order;
@@ -14,7 +14,7 @@ export default function OrderConfirmationPage() {
   if (!order) { navigate('/'); return null; }
 
   const deliveryDate = new Date(order.deliveryDate);
-  const formatted = deliveryDate.toLocaleDateString('en-EG', {
+  const formatted = deliveryDate.toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-EG', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
@@ -81,7 +81,7 @@ export default function OrderConfirmationPage() {
                   <Clock className="w-5 h-5 text-brand-500 shrink-0" />
                   <div>
                     <div className="font-medium text-gray-700">{t('confirm.timeSlot')}</div>
-                    <div className="text-brand-600 font-semibold">{order.timeSlot}</div>
+                    <div className="text-brand-600 font-semibold">{t(`confirm.slot_${order.timeSlot?.replace('–', '_')}`, order.timeSlot)}</div>
                   </div>
                 </div>
               )}

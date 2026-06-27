@@ -126,7 +126,7 @@ export default function MealDetailPage() {
                     <Scale className="w-5 h-5 text-brand-500" />
                     {t('mealDetails.ingredients')}
                   </h3>
-                  <p className="text-sm text-gray-500 mt-1">Scale ingredient amounts based on your portion size</p>
+                  <p className="text-sm text-gray-500 mt-1">{t('mealDetails.scalingDesc', 'Scale ingredient amounts based on your portion size')}</p>
                 </div>
                 <div className="flex bg-gray-100 p-1.5 rounded-xl self-start sm:self-center">
                   {[1, 2, 4, 6].map((opt) => (
@@ -175,7 +175,7 @@ export default function MealDetailPage() {
                 <div>
                   <h4 className="font-semibold text-amber-800 text-sm mb-1">{t('mealDetails.allergens')}</h4>
                   <p className="text-sm text-amber-700 capitalize leading-relaxed">
-                    {meal.allergens.join(' · ')}
+                    {meal.allergens.map(a => t(`allergens.${a.toLowerCase()}`, a)).join(' · ')}
                   </p>
                 </div>
               </div>
@@ -188,7 +188,7 @@ export default function MealDetailPage() {
               
               {/* Quick nutritional stats */}
               <div>
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Nutritional specs</h3>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">{t('mealDetails.nutritionalSpecs', 'Nutritional Specs')}</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl text-center">
                     <Flame className="w-5 h-5 text-orange-500 mx-auto mb-2" />
@@ -197,7 +197,7 @@ export default function MealDetailPage() {
                   </div>
                   <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl text-center">
                     <Utensils className="w-5 h-5 text-brand-500 mx-auto mb-2" />
-                    <div className="font-black text-gray-900 text-xl capitalize">{meal.cuisine}</div>
+                    <div className="font-black text-gray-900 text-xl capitalize">{t(`cuisine.${meal.cuisine?.toLowerCase()}`, meal.cuisine)}</div>
                     <div className="text-xs text-gray-400 mt-1">{t('mealDetails.cuisine')}</div>
                   </div>
                 </div>
@@ -207,7 +207,7 @@ export default function MealDetailPage() {
               <div className="bg-brand-50/50 border border-brand-100 p-4 rounded-2xl flex justify-between items-center">
                 <div>
                   <div className="text-xs text-brand-700 font-semibold">{t('mealDetails.price')}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">scaled for {servings} {servings === 1 ? t('subs.person') : t('subs.people')}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{t('mealDetails.scaledFor', 'scaled for')} {servings} {servings === 1 ? t('subs.person') : t('subs.people')}</div>
                 </div>
                 <div className="text-right">
                   <span className="font-display font-black text-brand-600 text-2xl">{currentPricePerServing.toFixed(0)}</span>
@@ -225,7 +225,7 @@ export default function MealDetailPage() {
               </button>
 
               <p className="text-xs text-gray-400 text-center">
-                Portioned with fresh, locally sourced Egyptian ingredients.
+                {t('mealDetails.portionedWith', 'Portioned with fresh, locally sourced Egyptian ingredients.')}
               </p>
 
             </div>

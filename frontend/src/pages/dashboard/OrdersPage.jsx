@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -9,12 +10,14 @@ import OrderTimeline from '../../components/OrderTimeline';
 
 export default function OrdersPage() {
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t , i18n } = useTranslation();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const statusConfig = {
     pending:          { labelKey: 'orders.pending',        color: 'badge-orange', icon: Clock },
@@ -27,6 +30,22 @@ export default function OrdersPage() {
   };
 
   const shortId = (id) => id?.slice(-8).toUpperCase() ?? '—';
+
+  const handleCancelOrder = async () => {
+    setCancelling(true);
+    try {
+      await api.patch(`/orders/${cancellingOrderId}/cancel`);
+      setOrders(prev => prev.map(o =>
+        o._id === cancellingOrderId ? { ...o, status: 'cancelled' } : o
+      ));
+      toast.success(t('orders.cancelSuccess', 'Order cancelled'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('orders.cancelFailed', 'Failed to cancel order'));
+    } finally {
+      setCancelling(false);
+      setCancellingOrderId(null);
+    }
+  };
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -93,9 +112,19 @@ export default function OrdersPage() {
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {order.deliveryAddress?.city || 'Cairo'}</span>
                     <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> {order.orderType === 'subscription' ? t('orders.subscription') : t('orders.oneTime')}</span>
                   </div>
-                  <button onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)} className="text-xs text-brand-600 font-semibold hover:underline">
-                    {expandedOrder === order._id ? t('orders.hideTracking') : t('orders.trackOrder')}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {order.status === 'pending' && (
+                      <button
+                        onClick={() => setCancellingOrderId(order._id)}
+                        className="text-xs text-red-500 font-semibold hover:underline"
+                      >
+                        {t('orders.cancelOrder', 'Cancel Order')}
+                      </button>
+                    )}
+                    <button onClick={() => setExpandedOrder(expandedOrder === order._id ? null : order._id)} className="text-xs text-brand-600 font-semibold hover:underline">
+                      {expandedOrder === order._id ? t('orders.hideTracking') : t('orders.trackOrder')}
+                    </button>
+                  </div>
                 </div>
                 {expandedOrder === order._id && (
                   <div className="mt-4 pt-4 border-t border-gray-100"><OrderTimeline status={order.status} /></div>
@@ -103,6 +132,32 @@ export default function OrdersPage() {
               </div>
             );
           })}
+        </div>
+      )}
+      {cancellingOrderId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 max-w-sm w-full">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <XCircle className="w-6 h-6 text-red-500" />
+            </div>
+            <h3 className="font-display font-bold text-lg text-center mb-2">{t('orders.cancelTitle', 'Cancel Order?')}</h3>
+            <p className="text-gray-500 text-sm text-center mb-6">{t('orders.cancelDesc', 'Are you sure you want to cancel this order? This cannot be undone.')}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCancellingOrderId(null)}
+                className="btn-outline flex-1"
+              >
+                {t('orders.keepOrder', 'Keep Order')}
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                disabled={cancelling}
+                className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {cancelling ? t('orders.cancelling', 'Cancelling...') : t('orders.confirmCancel', 'Yes, Cancel')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

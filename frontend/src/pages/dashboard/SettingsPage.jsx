@@ -6,7 +6,8 @@ import i18next from 'i18next';
 import { Save, Bell, Globe, UtensilsCrossed } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language?.startsWith('ar');
   const { user, updateSettings, loading } = useAuth();
 
   // Initialise from user.settings in the context (from database), falling back to sensible defaults
@@ -17,8 +18,14 @@ export default function SettingsPage() {
   });
 
   const handleSave = async () => {
+    // Update i18next language immediately for instant feedback
+    i18next.changeLanguage(settings.language);
     await updateSettings(settings);
   };
+
+  const toggleTranslate = settings.emailNotifications 
+  ? (isAr ? '-translate-x-5' : 'translate-x-5')
+  : 'translate-x-0';
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -44,11 +51,7 @@ export default function SettingsPage() {
               settings.emailNotifications ? 'bg-brand-500' : 'bg-gray-200'
             }`}
           >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                settings.emailNotifications ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
+            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${toggleTranslate}`} />
           </button>
         </div>
       </div>

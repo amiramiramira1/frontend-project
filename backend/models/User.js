@@ -2,11 +2,13 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const addressSchema = new mongoose.Schema({
+  label:      { type: String, default: 'Home' },
   street: String,
   city: String,
   country: String,
   postalCode: String,
   phone: String,
+  isDefault:  { type: Boolean, default: false },
 });
 
 const userSchema = new mongoose.Schema(

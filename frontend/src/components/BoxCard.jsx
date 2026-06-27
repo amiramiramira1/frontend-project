@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Heart } from 'lucide-react';
+import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 // Maps backend dietType values to display colors and emojis
 const dietStyles = {
@@ -15,7 +19,11 @@ const dietStyles = {
 const MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
 
 export default function BoxCard({ box }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const navigate = useNavigate();
+  const favorited = isFavorite(box._id);
   const style = dietStyles[box.dietType];
   // Show starting price for 2 servings (most popular)
   const displayPrice = box.basePrice ? (box.basePrice * MULTIPLIERS[2]).toFixed(0) : null;
@@ -37,6 +45,17 @@ export default function BoxCard({ box }) {
               <span className={`badge ${style.color}`}>{style.emoji} {t(`boxes.diet${box.dietType.charAt(0).toUpperCase() + box.dietType.slice(1)}`, box.dietType)}</span>
             </div>
           )}
+          {/* Favorite button (top left) */}
+          <button
+            onClick={e => {
+              e.preventDefault();
+              if (!user) { navigate('/login'); return; }
+              toggleFavorite(box._id);
+            }}
+            className="absolute top-3 left-3 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+          >
+            <Heart className={`w-4 h-4 transition-colors ${favorited ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
+          </button>
         </div>
 
         {/* Content */}

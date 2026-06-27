@@ -101,11 +101,11 @@ export default function SubscriptionsPage() {
                         {sub.box?.name || 'Meal Box'}
                       </h3>
                       <span className={`badge ${statusColors[sub.status] || 'badge-gray'}`}>
-                        {sub.status}
+                        {t(`subs.status${sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}`)}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500">
-                      {sub.frequency} · {sub.servingSize} {sub.servingSize === 1 ? t('subs.person') : t('subs.people')}
+                      {t(`subscribe.${sub.frequency}`)} · {sub.servingSize} {sub.servingSize === 1 ? t('subs.person') : t('subs.people')}
                     </p>
                   </div>
                   <div className="text-right">
@@ -123,7 +123,7 @@ export default function SubscriptionsPage() {
                     <div className="text-xs text-gray-500">{t('subs.nextDelivery')}</div>
                     <div className="text-sm font-semibold">
                       {sub.nextDeliveryDate
-                        ? new Date(sub.nextDeliveryDate).toLocaleDateString('en-EG', { month: 'short', day: 'numeric' })
+                        ? new Date(sub.nextDeliveryDate).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-EG', { month: 'short', day: 'numeric' })
                         : '—'}
                     </div>
                   </div>
@@ -131,7 +131,7 @@ export default function SubscriptionsPage() {
                     <Repeat className="w-4 h-4 text-brand-500 mx-auto mb-1" />
                     <div className="text-xs text-gray-500">{t('subs.deliveryDay')}</div>
                     <div className="text-sm font-semibold capitalize">
-                      {sub.deliveryDay || '—'}
+                    {t(`subscribe.${sub.deliveryDay?.toLowerCase()}`)}
                     </div>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3 text-center">
@@ -150,7 +150,7 @@ export default function SubscriptionsPage() {
                       onClick={() => navigate('/edit-subscription', { state: { sub } })}
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-xl transition-colors"
                     >
-                      <Pencil className="w-4 h-4" /> Edit
+                      <Pencil className="w-4 h-4" /> {t('subs.edit')}
                     </button>
                   )}
                   {sub.status === 'active' && (
