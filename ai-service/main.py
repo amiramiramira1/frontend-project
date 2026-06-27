@@ -907,6 +907,12 @@ async def execute_tool(tool_name: str, args: dict, user_token: str = None, langu
                     "servingSize": int(args["servingSize"]),
                     "frequency": args["frequency"],
                 }
+                if args.get("deliveryDay"):
+                    payload["deliveryDay"] = args["deliveryDay"]
+                if args.get("deliveryAddress"):
+                    payload["deliveryAddress"] = args["deliveryAddress"]
+                if args.get("phone"):
+                    payload["phone"] = args["phone"]
                 resp = await client.post(f"{BACKEND_URL}/api/subscriptions", headers=headers, json=payload)
                 data = resp.json()
                 if resp.status_code >= 400:
@@ -1159,10 +1165,20 @@ MAX_QTY_PER_MEAL = 3
 MAX_TOTAL_MEALS = 10
 
 # State-machine step identifiers
-BB_SELECTING = "SELECTING"
-BB_SERVING   = "ASK_SERVING"
-BB_PURCHASE  = "ASK_PURCHASE"
-BB_CONFIRM   = "CONFIRM"
+BB_SELECTING    = "SELECTING"
+BB_SERVING      = "ASK_SERVING"
+BB_PURCHASE     = "ASK_PURCHASE"
+BB_DELIVERY_DAY = "ASK_DELIVERY_DAY"   # subscription only
+BB_ADDRESS      = "ASK_ADDRESS"        # subscription only
+BB_CONFIRM      = "CONFIRM"
+
+# Recurring delivery weekdays (must match the backend Subscription enum)
+DELIVERY_DAYS = ["saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday"]
+_DAY_LABELS_AR = {
+    "saturday": "السبت", "sunday": "الأحد", "monday": "الإثنين",
+    "tuesday": "الثلاثاء", "wednesday": "الأربعاء", "thursday": "الخميس",
+    "friday": "الجمعة",
+}
 
 BUILD_BOX_SYSTEM_PROMPT = """You are Boxify Chef 🥕, guiding a user through a FIXED, step-by-step "build your own box" flow.
 You will be given the canonical message for the current step. Your ONLY job is to rephrase it warmly and naturally, in 1-2 short sentences.
@@ -1183,7 +1199,12 @@ def _bb_text(key: str, lang: str, **kw) -> str:
         "summary": "Your box so far: {items} — {count} meal(s), {price} EGP. Add more, or tap “Done selecting”.",
         "ask_serving": "Great choice! How many people is this box for?",
         "ask_purchase": "Perfect. Would you like this as a one-time order or a recurring subscription?",
+        "ask_day": "Which day would you like your recurring deliveries?",
+        "ask_address_saved": "Where should we deliver? Tap a saved address below, or type a new one as: street, city.",
+        "ask_address_new": "What's your delivery address? Please type it as: street, city.",
+        "address_need_city": "I need at least a street and a city. Please type it as: street, city.",
         "confirm": "Here's your box: {items}. Serving size {serving}, {ptype}. Total {price} EGP. Shall I create it?",
+        "confirm_sub": "Here's your subscription: {items}. Serving size {serving}, {ptype}, delivered every {day} to {address}. Total {price} EGP per delivery. Shall I set it up?",
         "created_cart": "Done! 🎉 I created your custom box and added it to your cart. Total {price} EGP.",
         "created_sub": "Done! 🎉 Your {freq} for the custom box is all set up.",
         "cancelled": "No problem — I've cancelled the box builder. Want to do something else?",
@@ -1197,7 +1218,12 @@ def _bb_text(key: str, lang: str, **kw) -> str:
         "summary": "البوكس لحد دلوقتي: {items} — {count} وجبة، {price} جنيه. ضيف كمان، أو دوس «خلصت الاختيار».",
         "ask_serving": "اختيار جميل! البوكس ده لكام شخص؟",
         "ask_purchase": "تمام. تحبه طلب لمرة واحدة ولا اشتراك متكرر؟",
+        "ask_day": "تحب يوصلك الاشتراك يوم إيه كل مرة؟",
+        "ask_address_saved": "نوصّل فين؟ اختار عنوان محفوظ من تحت، أو اكتب عنوان جديد بالشكل: الشارع، المدينة.",
+        "ask_address_new": "إيه عنوان التوصيل؟ اكتبه بالشكل ده: الشارع، المدينة.",
+        "address_need_city": "محتاج على الأقل الشارع والمدينة. اكتبه بالشكل: الشارع، المدينة.",
         "confirm": "ده البوكس بتاعك: {items}. حجم التقديم {serving}، {ptype}. الإجمالي {price} جنيه. أعمله؟",
+        "confirm_sub": "ده اشتراكك: {items}. حجم التقديم {serving}، {ptype}، بيتوصّل كل {day} على {address}. الإجمالي {price} جنيه لكل توصيلة. أظبطه؟",
         "created_cart": "تمام! 🎉 عملت البوكس المخصص وضفته للسلة. الإجمالي {price} جنيه.",
         "created_sub": "تمام! 🎉 {freq} للبوكس المخصص اتظبط.",
         "cancelled": "ولا يهمك — لغيت بناء البوكس. تحب نعمل حاجة تانية؟",
@@ -1275,6 +1301,66 @@ def _confirm_quick_actions(lang: str) -> list:
         {"text": "Back to meals", "action": {"type": "edit"}},
         {"text": "Cancel", "action": {"type": "cancel"}},
     ]
+
+
+def _day_chips(lang: str) -> list:
+    chips = []
+    for day in DELIVERY_DAYS:
+        label = _DAY_LABELS_AR[day] if lang == "ar" else day.capitalize()
+        chips.append({"text": label, "action": {"type": "set_day", "day": day}})
+    chips.append({"text": "إلغاء" if lang == "ar" else "Cancel", "action": {"type": "cancel"}})
+    return chips
+
+
+def _day_label(day: str, lang: str) -> str:
+    return _DAY_LABELS_AR.get(day, day) if lang == "ar" else (day or "").capitalize()
+
+
+def _address_label(addr: dict) -> str:
+    if not addr:
+        return ""
+    parts = [addr.get("street"), addr.get("city")]
+    return ", ".join([p for p in parts if p])
+
+
+def _address_quick_actions(lang: str, saved: list) -> list:
+    actions = []
+    for i, addr in enumerate(saved[:3]):
+        label = _address_label(addr)
+        if label:
+            actions.append({"text": ("📍 " + label), "action": {"type": "use_address", "index": i}})
+    actions.append({"text": "إلغاء" if lang == "ar" else "Cancel", "action": {"type": "cancel"}})
+    return actions
+
+
+def _parse_address_text(text: str) -> Optional[dict]:
+    """Parse a typed address of the form 'street, city[, country]'. Returns None
+    if a street and city can't be identified."""
+    if not text:
+        return None
+    parts = [p.strip() for p in re.split(r"[,،]", text) if p.strip()]
+    if len(parts) < 2:
+        return None
+    addr = {"street": parts[0], "city": parts[1]}
+    if len(parts) >= 3:
+        addr["country"] = parts[2]
+    return addr
+
+
+async def _fetch_user_addresses(user_token: Optional[str]) -> list:
+    if not user_token:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{BACKEND_URL}/api/auth/me",
+                headers={"Authorization": f"Bearer {user_token}"},
+            )
+            if resp.status_code >= 400:
+                return []
+            return (resp.json().get("user", {}) or {}).get("addresses", []) or []
+    except Exception:
+        return []
 
 
 def _items_str(selection: dict, lang: str) -> str:
@@ -1451,6 +1537,31 @@ async def _bb_fetch_menu(diet: str, user_token: Optional[str], lang: str) -> lis
     return result.get("meals", []) if isinstance(result, dict) else []
 
 
+async def _bb_confirm_step(state: dict, selection: dict, sid: str,
+                           user_token: Optional[str], lang: str) -> dict:
+    """Compute the live price and build the CONFIRM response (one-time or subscription)."""
+    serving = state.get("servingSize", 2)
+    ptype = state.get("purchaseType", "one_time")
+    preview = await _calculate_custom_box(_expand_meal_ids(selection), serving, user_token)
+    price = _bb_price_info(selection, serving, preview)
+    state["priceInfo"] = price
+    state["step"] = BB_CONFIRM
+    if ptype == "one_time":
+        canonical = _bb_text("confirm", lang, items=_items_str(selection, lang),
+                             serving=serving, ptype=_ptype_label(ptype, lang),
+                             price=price.get("totalPrice"))
+    else:
+        canonical = _bb_text("confirm_sub", lang, items=_items_str(selection, lang),
+                             serving=serving, ptype=_ptype_label(ptype, lang),
+                             day=_day_label(state.get("deliveryDay"), lang),
+                             address=_address_label(state.get("deliveryAddress")),
+                             price=price.get("totalPrice"))
+    txt = await narrate_step(canonical, lang)
+    await save_session_message(sid, "model", txt)
+    return _bb_response(txt, BB_CONFIRM, selection=_selection_items(selection),
+                        price=price, quick_actions=_confirm_quick_actions(lang))
+
+
 async def handle_custom_box_flow(req: "ChatRequest", sid: str, user_token: Optional[str],
                                  lang: str, state: dict, action: dict) -> tuple[dict, Optional[dict]]:
     """Deterministic build-a-box state machine.
@@ -1574,17 +1685,64 @@ async def handle_custom_box_flow(req: "ChatRequest", sid: str, user_token: Optio
             return _bb_response(txt, BB_PURCHASE, selection=_selection_items(selection),
                                 quick_actions=_purchase_quick_actions(lang)), state
         state["purchaseType"] = mode
-        state["step"] = BB_CONFIRM
-        serving = state.get("servingSize", 2)
-        preview = await _calculate_custom_box(_expand_meal_ids(selection), serving, user_token)
-        price = _bb_price_info(selection, serving, preview)
-        state["priceInfo"] = price
-        txt = await narrate_step(_bb_text("confirm", lang, items=_items_str(selection, lang),
-                                          serving=serving, ptype=_ptype_label(mode, lang),
-                                          price=price.get("totalPrice")), lang)
+        if mode == "one_time":
+            resp = await _bb_confirm_step(state, selection, sid, user_token, lang)
+            return resp, state
+        # Subscription → collect the recurring delivery day, then the address
+        state["step"] = BB_DELIVERY_DAY
+        txt = await narrate_step(_bb_text("ask_day", lang), lang)
         await save_session_message(sid, "model", txt)
-        return _bb_response(txt, BB_CONFIRM, selection=_selection_items(selection),
-                            price=price, quick_actions=_confirm_quick_actions(lang)), state
+        return _bb_response(txt, BB_DELIVERY_DAY, selection=_selection_items(selection),
+                            quick_actions=_day_chips(lang)), state
+
+    # ── ASK_DELIVERY_DAY (subscription only) ────────────────────────────────
+    if step == BB_DELIVERY_DAY:
+        day = None
+        if atype == "set_day":
+            day = action.get("day")
+        else:
+            low = message.lower()
+            for d in DELIVERY_DAYS:
+                if d in low or _DAY_LABELS_AR[d] in message:
+                    day = d
+                    break
+        if day not in DELIVERY_DAYS:
+            txt = _bb_text("ask_day", lang)
+            return _bb_response(txt, BB_DELIVERY_DAY, selection=_selection_items(selection),
+                                quick_actions=_day_chips(lang)), state
+        state["deliveryDay"] = day
+        state["step"] = BB_ADDRESS
+        saved = await _fetch_user_addresses(user_token)
+        state["savedAddresses"] = saved
+        key = "ask_address_saved" if saved else "ask_address_new"
+        txt = await narrate_step(_bb_text(key, lang), lang)
+        await save_session_message(sid, "model", txt)
+        return _bb_response(txt, BB_ADDRESS, selection=_selection_items(selection),
+                            quick_actions=_address_quick_actions(lang, saved)), state
+
+    # ── ASK_ADDRESS (subscription only) ─────────────────────────────────────
+    if step == BB_ADDRESS:
+        addr = None
+        if atype == "use_address":
+            saved = state.get("savedAddresses") or []
+            idx = int(action.get("index", -1))
+            if 0 <= idx < len(saved):
+                a = saved[idx]
+                addr = {"street": a.get("street"), "city": a.get("city")}
+                if a.get("country"):
+                    addr["country"] = a.get("country")
+                if a.get("postalCode"):
+                    addr["postalCode"] = a.get("postalCode")
+        else:
+            addr = _parse_address_text(message)
+        if not addr or not addr.get("street") or not addr.get("city"):
+            saved = state.get("savedAddresses") or []
+            txt = _bb_text("address_need_city", lang)
+            return _bb_response(txt, BB_ADDRESS, selection=_selection_items(selection),
+                                quick_actions=_address_quick_actions(lang, saved)), state
+        state["deliveryAddress"] = addr
+        resp = await _bb_confirm_step(state, selection, sid, user_token, lang)
+        return resp, state
 
     # ── CONFIRM ─────────────────────────────────────────────────────────────
     if step == BB_CONFIRM:
@@ -1628,7 +1786,9 @@ async def handle_custom_box_flow(req: "ChatRequest", sid: str, user_token: Optio
                 total = (cart_res or {}).get("cartTotal") or (state.get("priceInfo") or {}).get("totalPrice")
                 txt = await narrate_step(_bb_text("created_cart", lang, price=total), lang)
             else:
-                sub_args = {"boxId": box_id, "servingSize": serving, "frequency": ptype}
+                sub_args = {"boxId": box_id, "servingSize": serving, "frequency": ptype,
+                            "deliveryDay": state.get("deliveryDay"),
+                            "deliveryAddress": state.get("deliveryAddress")}
                 sub_res = await execute_tool("create_subscription", sub_args, user_token, lang)
                 tool_calls.append({"tool": "create_subscription", "args": sub_args, "result": sub_res})
                 txt = await narrate_step(_bb_text("created_sub", lang, freq=_ptype_label(ptype, lang)), lang)

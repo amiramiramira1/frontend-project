@@ -9,8 +9,8 @@ const emailService = require('../services/emailService');
 // @access  Private
 const createSubscription = async (req, res) => {
   try {
-    const { boxId, servingSize, frequency, deliveryDay } = req.body;
-    
+    const { boxId, servingSize, frequency, deliveryDay, deliveryAddress, phone } = req.body;
+
     const box = await Box.findById(boxId).populate('meals');
     if (!box) return res.status(404).json({ message: 'Box not found' });
 
@@ -30,6 +30,8 @@ const createSubscription = async (req, res) => {
       servingSize,
       frequency,
       deliveryDay,
+      deliveryAddress,
+      phone,
       nextDeliveryDate: getNextDeliveryDate(frequency, deliveryDay),
       mealRotation: box.meals.map((m) => m._id),
     });

@@ -8,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 
 // Day keys map to locale keys under subscribe.*
-const dayKeys = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu'];
-const dayValues = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday'];
+const dayKeys = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'];
+const dayValues = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 
 export default function SubscribePage() {
   const { user } = useAuth();
@@ -17,15 +17,30 @@ export default function SubscribePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ frequency: 'weekly', deliveryDay: 'saturday' });
+  const [form, setForm] = useState({
+    frequency: 'weekly', deliveryDay: 'saturday',
+    street: '', city: '', country: 'Egypt', phone: '',
+  });
 
   const type = searchParams.get('type') || 'pre-made';
   const boxId = searchParams.get('boxId');
   const servings = parseInt(searchParams.get('servings') || '2');
   const name = searchParams.get('name') || 'Meal Box';
-  const mealIds = searchParams.get('mealIds')?.split(',').filter(Boolean) || [];
 
   useEffect(() => { if (!user) navigate('/login'); }, [user]);
+
+  // Prefill the delivery address from the user's saved default address
+  useEffect(() => {
+    const a = user?.addresses?.[0];
+    if (a) {
+      setForm(p => ({
+        ...p,
+        street: p.street || a.street || '',
+        city: p.city || a.city || '',
+        country: p.country || a.country || 'Egypt',
+      }));
+    }
+  }, [user]);
 
   const frequencies = [
     { value: 'weekly',  label: t('subscribe.weekly'),  desc: t('subscribe.weeklyDesc') },
@@ -40,9 +55,24 @@ export default function SubscribePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!boxId) { toast.error(i18next.t('msg.subscribeNoBox')); return; }
+    if (!form.street.trim() || !form.city.trim()) {
+      toast.error(t('subscribe.addressRequired', { defaultValue: 'Please enter your delivery street and city' }));
+      return;
+    }
     setLoading(true);
     try {
-      await api.post('/subscriptions', { boxId, servingSize: servings, frequency: form.frequency, deliveryDay: form.deliveryDay });
+      await api.post('/subscriptions', {
+        boxId,
+        servingSize: servings,
+        frequency: form.frequency,
+        deliveryDay: form.deliveryDay,
+        deliveryAddress: {
+          street: form.street.trim(),
+          city: form.city.trim(),
+          country: form.country.trim() || undefined,
+        },
+        phone: form.phone.trim() || undefined,
+      });
       toast.success(i18next.t('msg.subscribeCreated'));
       navigate('/dashboard/subscriptions');
     } catch (err) {
@@ -113,6 +143,40 @@ export default function SubscribePage() {
                     {t(`subscribe.${key}`)}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Delivery Address */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                {t('subscribe.addressLabel', { defaultValue: 'Delivery address' })}
+              </label>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={form.street}
+                  onChange={e => setForm(p => ({ ...p, street: e.target.value }))}
+                  placeholder={t('subscribe.streetPh', { defaultValue: 'Street address' })}
+                  className="input-field"
+                  required
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={form.city}
+                    onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
+                    placeholder={t('subscribe.cityPh', { defaultValue: 'City' })}
+                    className="input-field"
+                    required
+                  />
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                    placeholder={t('subscribe.phonePh', { defaultValue: 'Phone (optional)' })}
+                    className="input-field"
+                  />
+                </div>
               </div>
             </div>
 

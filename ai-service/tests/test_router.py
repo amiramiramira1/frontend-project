@@ -570,6 +570,48 @@ async def test_bb_confirm_subscription_creates_box_and_subscription():
 
 
 @pytest.mark.asyncio
+async def test_bb_subscription_collects_day_and_address():
+    # purchase = weekly → must ask for the delivery day (not jump to confirm)
+    state = {"step": main.BB_PURCHASE, "dietFilter": "all", "menu": MENU, "servingSize": 2,
+             "selection": {"m1": {"name": "Steak", "price": 90, "qty": 1}}}
+    action = {"type": "set_purchase", "mode": "weekly"}
+    resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert resp["flowState"] == main.BB_DELIVERY_DAY
+    assert any(q["action"].get("type") == "set_day" for q in resp["quickActions"])
+
+    # pick a day → ask for address (no saved addresses → type one)
+    with patch("main._fetch_user_addresses", new=AsyncMock(return_value=[])):
+        action = {"type": "set_day", "day": "monday"}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state["deliveryDay"] == "monday"
+    assert resp["flowState"] == main.BB_ADDRESS
+
+    # type a free-text address → confirm
+    with patch("main._calculate_custom_box", new=AsyncMock(return_value={"priceForServingSize": 162})):
+        req = main.ChatRequest(message="12 Tahrir St, Cairo", session_id="bb", user_token="tok", flow="custom_box")
+        resp, state = await main.handle_custom_box_flow(req, "bb", "tok", "en", state, {})
+    assert state["deliveryAddress"]["street"] == "12 Tahrir St"
+    assert state["deliveryAddress"]["city"] == "Cairo"
+    assert resp["flowState"] == main.BB_CONFIRM
+
+    # confirm → create_subscription must carry deliveryDay + deliveryAddress
+    captured = {}
+    def side(tool, args, token, lang):
+        if tool == "create_custom_box":
+            return {"success": True, "boxId": "box_1"}
+        if tool == "create_subscription":
+            captured.update(args)
+            return {"success": True, "subscriptionId": "sub_1"}
+        return {}
+    with patch("main.execute_tool", new=AsyncMock(side_effect=side)):
+        action = {"type": "confirm"}
+        resp, state = await main.handle_custom_box_flow(_req(action=action), "bb", "tok", "en", state, action)
+    assert state is None
+    assert captured.get("deliveryDay") == "monday"
+    assert captured.get("deliveryAddress", {}).get("city") == "Cairo"
+
+
+@pytest.mark.asyncio
 async def test_bb_confirm_requires_login():
     state = {"step": main.BB_CONFIRM, "servingSize": 2, "purchaseType": "one_time",
              "priceInfo": {"totalPrice": 162},
