@@ -185,6 +185,7 @@ export const AuthProvider = ({ children }) => {
       isAdmin: user?.role === 'admin',
       loginWithGoogle,
       deleteAccount,
+      persistUser,
     }}>
       {children}
     </AuthContext.Provider>

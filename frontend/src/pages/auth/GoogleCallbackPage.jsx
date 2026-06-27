@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 /**
@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
  */
 export default function GoogleCallbackPage() {
   const navigate = useNavigate();
+  const { persistUser } = useAuth();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -27,8 +28,7 @@ export default function GoogleCallbackPage() {
       const user = JSON.parse(decodeURIComponent(rawUser));
 
       // Persist exactly like the normal login flow does
-      localStorage.setItem('boxify_token', token);
-      localStorage.setItem('boxify_user', JSON.stringify(user));
+      persistUser(user, token);
 
       toast.success(`Welcome, ${user.name}! 🎉`);
 

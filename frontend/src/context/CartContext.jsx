@@ -28,7 +28,7 @@ export const CartProvider = ({ children }) => {
   const fetchCart = async () => {
     try {
       const { data } = await api.get('/cart');
-      setCart(data.cart);
+      setCart(data?.cart || { items: [], cartTotal: 0 });
     } catch {
       // 401 = not logged in, ignore silently
       setCart({ items: [], cartTotal: 0 });
@@ -46,8 +46,8 @@ export const CartProvider = ({ children }) => {
         servingSize: payload.servingsPerMeal, // map old name → backend name
         quantity:    payload.quantity || 1,
       });
-      setCart(data.cart);
-      return data.cart;
+      setCart(data?.cart || { items: [], cartTotal: 0 });
+      return data?.cart || { items: [], cartTotal: 0 };
     } catch (err) {
       const msg = err.response?.data?.message || i18next.t('msg.addToCartFailed');
       toast.error(msg);
@@ -64,7 +64,7 @@ export const CartProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await api.put(`/cart/items/${itemId}`, updates);
-      setCart(data.cart);
+      setCart(data?.cart || { items: [], cartTotal: 0 });
     } catch (err) {
       toast.error(err.response?.data?.message || i18next.t('msg.updateCartFailed'));
     } finally {
@@ -77,7 +77,7 @@ export const CartProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await api.delete(`/cart/items/${itemId}`);
-      setCart(data.cart);
+      setCart(data?.cart || { items: [], cartTotal: 0 });
     } catch (err) {
       toast.error(err.response?.data?.message || i18next.t('msg.removeItemFailed'));
     } finally {
@@ -90,7 +90,7 @@ export const CartProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await api.delete('/cart');
-      setCart(data.cart);
+      setCart(data?.cart || { items: [], cartTotal: 0 });
     } catch (err) {
       toast.error(i18next.t('msg.clearCartFailed'));
     } finally {
@@ -99,7 +99,7 @@ export const CartProvider = ({ children }) => {
   };
 
   // Total number of items (sum of quantities) — used by Navbar badge
-  const itemCount = cart.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0;
+  const itemCount = cart?.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 0;
 
   return (
     <CartContext.Provider value={{ cart, addToCart, updateItem, removeItem, clearCart, fetchCart, loading, itemCount }}>

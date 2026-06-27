@@ -19,6 +19,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Format validation errors nicely for display
+    if (
+      err.response?.status === 400 &&
+      err.response?.data?.message === 'Validation failed' &&
+      Array.isArray(err.response?.data?.errors)
+    ) {
+      const messages = err.response.data.errors.map((e) => e.message);
+      err.response.data.message = messages.join('. ');
+    }
+
     const isAuthRequest = err.config?.url?.includes('/auth/login') || err.config?.url?.includes('/auth/register');
     
     if (err.response?.status === 401 && !isAuthRequest) {

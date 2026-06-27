@@ -135,6 +135,59 @@ const infoRow = (label, value) => `
 
 // ── Low-level send ────────────────────────────────────────────────────────────
 const sendEmail = async ({ to, subject, html }) => {
+  // If running in a test environment, do not send real emails or hit external APIs
+  if (process.env.NODE_ENV === 'test') {
+    return { messageId: 'test-mock-id' };
+  }
+
+  // If we are using Resend, use their HTTPS API to bypass SMTP port blocking on Render
+  if (
+    process.env.SMTP_HOST === 'smtp.resend.com' ||
+    (process.env.SMTP_PASS && process.env.SMTP_PASS.startsWith('re_'))
+  ) {
+    const https = require('https');
+    return new Promise((resolve, reject) => {
+      const postData = JSON.stringify({
+        from: FROM_ADDRESS,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+      });
+
+      const options = {
+        hostname: 'api.resend.com',
+        port: 443,
+        path: '/emails',
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.SMTP_PASS}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (err) {
+              resolve({ message: 'Success (unable to parse JSON response)' });
+            }
+          } else {
+            reject(new Error(`Resend API returned status ${res.statusCode}: ${data}`));
+          }
+        });
+      });
+
+      req.on('error', (e) => { reject(e); });
+      req.write(postData);
+      req.end();
+    });
+  }
+
   const transporter = await getTransporter();
   const info = await transporter.sendMail({ from: FROM_ADDRESS, to, subject, html });
 

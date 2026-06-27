@@ -19,6 +19,7 @@ export default function HomePage() {
   useEffect(() => {
     api.get('/boxes', { params: { limit: 3 } })
       .then(({ data }) => setFeaturedBoxes(data.boxes || []))
+      .catch(() => setFeaturedBoxes([]))
       .finally(() => setLoading(false));
   }, [i18n.language]);
 
