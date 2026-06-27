@@ -136,6 +136,29 @@
     "people":       "people"
   },
 
+  "editSub": {
+  "title":       "Edit Subscription",
+  "subtitle":    "Update your delivery preferences",
+  "preMade":     "Pre-Made Box",
+  "customBox":   "Custom Box",
+  "frequency":   "Delivery Frequency",
+  "weekly":      "Weekly",
+  "everyWeek":   "Every week",
+  "monthly":     "Monthly",
+  "everyMonth":  "Every month",
+  "servingSize": "Serving Size",
+  "cancel":      "Cancel",
+  "save":        "Save Changes",
+  "saving":      "Saving...",
+  "deliveryDay": "Delivery Day",
+  "saturday":    "Saturday",
+  "sunday":      "Sunday",
+  "monday":      "Monday",
+  "tuesday":     "Tuesday",
+  "wednesday":   "Wednesday",
+  "thursday":    "Thursday"
+},
+
   "msg": {
     "loginFailed":           "Invalid email address or password. Please try again.",
     "googleLoginFailed":     "Authentication with Google failed. Please try again.",
