@@ -23,8 +23,11 @@ export default function BoxesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedDiet, setSelectedDiet] = useState('all');
   const [compareIds, setCompareIds] = useState([]);
+  const handleDietChange = (diet) => { setSelectedDiet(diet); setPage(1); };
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -34,8 +37,11 @@ export default function BoxesPage() {
       try {
         const params = {};
         if (selectedDiet !== 'all') params.dietType = selectedDiet;
+        params.page = page;
+        params.limit = 10;
         const { data } = await api.get('/boxes', { params });
         setBoxes(data.boxes || []);
+        setTotalPages(data.pagination?.totalPages || 1);
       } catch (err) {
         setError(t('msg.loadBoxesFailed'));
         console.error(err);
@@ -44,7 +50,7 @@ export default function BoxesPage() {
       }
     };
     fetchBoxes();
-  }, [selectedDiet, i18n.language]);
+  }, [selectedDiet, i18n.language, page]);
 
   const filteredBoxes = boxes.filter(box => {
     if (!search) return true;
@@ -177,6 +183,29 @@ export default function BoxesPage() {
           </>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-8 mb-8">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="btn-outline !py-2 !px-4 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t('boxes.prevPage', 'Previous')}
+          </button>
+          <span className="text-sm text-gray-500">
+            {t('boxes.pageOf', 'Page')} {page} {t('boxes.of', 'of')} {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="btn-primary !py-2 !px-4 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t('boxes.nextPage', 'Next')}
+          </button>
+        </div>
+      )}
 
       {/* Floating Compare Button */}
       {compareIds.length >= 2 && (

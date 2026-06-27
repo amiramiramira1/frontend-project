@@ -113,13 +113,13 @@ export default function HomePage() {
             {loadingRecommended ? (
               <div className="flex gap-4 overflow-x-auto pb-2">
                 {[1,2,3].map(i => (
-                  <div key={i} className="min-w-[280px] h-64 card animate-pulse bg-gray-100 rounded-2xl flex-shrink-0" />
+                  <div key={i} className="w-[90vw] md:w-[calc(33.333%-16px)] h-64 card animate-pulse bg-gray-100 rounded-2xl flex-shrink-0" />
                 ))}
               </div>
             ) : (
-              <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden -mx-4 px-4">
+              <div className="flex gap-6 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden -mx-4 px-4">
                 {recommendedBoxes.map(box => (
-                  <div key={box._id} className="min-w-[280px] flex-shrink-0">
+                  <div key={box._id} className="w-[90vw] md:w-[calc(33.333%-16px)] flex-shrink-0">
                     <BoxCard box={box} />
                   </div>
                 ))}
