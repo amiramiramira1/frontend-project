@@ -51,7 +51,6 @@ export default function BoxDetailPage() {
   const [servings, setServings] = useState(2);
   const [adding, setAdding] = useState(false);
 
-  // Reviews remain client-side until reviews API is built
   const [reviews, setReviews] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [newRating, setNewRating] = useState(0);
@@ -67,6 +66,7 @@ export default function BoxDetailPage() {
       try {
         const { data } = await api.get(`/boxes/${id}`);
         setBox(data.box);
+        setReviews(data.box.reviews || []);
       } catch (err) {
         if (err.response?.status === 404) navigate('/boxes');
         else toast.error('Failed to load box details');
@@ -100,7 +100,7 @@ export default function BoxDetailPage() {
   const sortedReviews = [...reviews].sort((a, b) => {
     if (sortBy === 'highest') return b.rating - a.rating;
     if (sortBy === 'lowest')  return a.rating - b.rating;
-    return 0;
+    return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
   const handleAddToCart = async () => {
@@ -121,27 +121,30 @@ export default function BoxDetailPage() {
     navigate(`/subscribe?boxId=${box._id}&servings=${servings}&type=pre-made&name=${encodeURIComponent(box.name)}`);
   };
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
+    if (!user) { navigate('/login'); return; }
     if (newRating === 0) { toast.error(t('boxDetails.pleaseSelectRating', 'Please select a star rating!')); return; }
     if (!newComment.trim()) { toast.error(t('boxDetails.pleaseWriteComment', 'Please write a comment!')); return; }
-    if (reviews.some(r => r.name === user?.name)) { toast.error(t('boxDetails.alreadyReviewed', 'You have already reviewed this box!')); return; }
 
-    const review = {
-      _id: `r-${Date.now()}`,
-      name: user?.name || t('boxDetails.anonymous', 'Anonymous'),
-      rating: newRating,
-      comment: newComment.trim(),
-      date: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-    };
-    setReviews(prev => [review, ...prev]);
-    setNewRating(0); setHoverRating(0); setNewComment(''); setShowForm(false);
-    toast.success(t('boxDetails.reviewSubmitted', 'Review submitted! 🎉'));
+    try {
+      const { data } = await api.post(`/boxes/${id}/reviews`, { rating: newRating, comment: newComment.trim() });
+      setReviews(prev => [data.review, ...prev]);
+      setNewRating(0); setHoverRating(0); setNewComment(''); setShowForm(false);
+      toast.success(t('boxDetails.reviewSubmitted', 'Review submitted! 🎉'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('boxDetails.reviewFailed', 'Failed to submit review'));
+    }
   };
 
-  const handleDeleteReview = (reviewId) => {
+  const handleDeleteReview = async (reviewId) => {
+    try {
+      await api.delete(`/boxes/${id}/reviews/${reviewId}`);
       setReviews(prev => prev.filter(r => r._id !== reviewId));
       toast.success(t('boxDetails.reviewDeleted', 'Review deleted'));
-    };
+    } catch (err) {
+      toast.error(err.response?.data?.message || t('boxDetails.reviewDeleteFailed', 'Failed to delete review'));
+    }
+  };
 
 
   const ratingLabels = {
@@ -384,12 +387,16 @@ export default function BoxDetailPage() {
                                   <CheckCircle className="w-3 h-3" /> {t('boxDetails.verified', 'Verified')}
                                 </span>
                               </div>
-                              <div className="text-xs text-gray-400 mt-0.5">{review.date}</div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {review.createdAt
+                                  ? new Date(review.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                                  : review.date}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <StarRating rating={review.rating} size="md" />
-                            {review.name === user?.name && (
+                            {(review.user === user?._id || review.name === user?.name) && (
                               <button
                                 onClick={() => handleDeleteReview(review._id)}
                                 className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"

@@ -405,5 +405,64 @@ const getRecommendedBoxes = async (req, res) => {
   }
 };
 
-// Add to module.exports:
-module.exports = { getBoxes, getBox, createBox, createCustomBox, updateBox, deleteBox, calculateCustomBox, getRecommendedBoxes };
+// @route   POST /api/boxes/:id/reviews
+// @access  Private
+const addReview = async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+    if (!comment || !comment.trim()) {
+      return res.status(400).json({ message: 'Comment is required' });
+    }
+
+    const box = await Box.findById(req.params.id);
+    if (!box) return res.status(404).json({ message: 'Box not found' });
+
+    const alreadyReviewed = box.reviews.some(
+      (r) => r.user.toString() === req.user._id.toString()
+    );
+    if (alreadyReviewed) {
+      return res.status(400).json({ message: 'You have already reviewed this box' });
+    }
+
+    const review = {
+      user: req.user._id,
+      name: req.user.name,
+      rating: Number(rating),
+      comment: comment.trim(),
+    };
+    box.reviews.push(review);
+    await box.save();
+
+    const saved = box.reviews[box.reviews.length - 1];
+    res.status(201).json({ review: saved });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @route   DELETE /api/boxes/:id/reviews/:reviewId
+// @access  Private
+const deleteReview = async (req, res) => {
+  try {
+    const box = await Box.findById(req.params.id);
+    if (!box) return res.status(404).json({ message: 'Box not found' });
+
+    const review = box.reviews.id(req.params.reviewId);
+    if (!review) return res.status(404).json({ message: 'Review not found' });
+
+    if (review.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete this review' });
+    }
+
+    review.deleteOne();
+    await box.save();
+    res.status(200).json({ message: 'Review deleted' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getBoxes, getBox, createBox, createCustomBox, updateBox, deleteBox, calculateCustomBox, getRecommendedBoxes, addReview, deleteReview };
