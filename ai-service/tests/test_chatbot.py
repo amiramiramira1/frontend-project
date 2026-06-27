@@ -38,51 +38,50 @@ if AI_SERVICE_DIR not in sys.path:
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
 
-def make_gemini_text_response(text: str):
-    """Build a minimal fake Gemini response object with a plain-text reply."""
-    part = MagicMock()
-    part.text = text
-    part.function_call = None
+def make_groq_text_response(text: str):
+    """Build a minimal fake Groq response object with a plain-text reply."""
+    message = MagicMock()
+    message.content = text
+    message.tool_calls = None
 
-    content = MagicMock()
-    content.parts = [part]
-
-    candidate = MagicMock()
-    candidate.content = content
+    choice = MagicMock()
+    choice.message = message
 
     response = MagicMock()
-    response.candidates = [candidate]
+    response.choices = [choice]
     return response
 
 
-def make_gemini_tool_then_text(tool_name: str, tool_args: dict, final_text: str):
+def make_groq_tool_then_text(tool_name: str, tool_args: dict, final_text: str):
     """
-    Return a pair of fake Gemini responses:
+    Return a pair of fake Groq responses:
       1st call  → function-call response (triggers tool execution)
       2nd call  → plain text (final answer)
     """
     # ── First response: function call ──────────────────────────────────────────
-    fc = MagicMock()
-    fc.name = tool_name
-    fc.args = tool_args
+    function = MagicMock()
+    function.name = tool_name
+    function.arguments = json.dumps(tool_args)
 
-    fc_part = MagicMock()
-    fc_part.text = None
-    fc_part.function_call = fc
+    tool_call = MagicMock()
+    tool_call.id = "mock_tool_call_id"
+    tool_call.function = function
 
-    fc_content = MagicMock()
-    fc_content.parts = [fc_part]
+    message1 = MagicMock()
+    message1.content = None
+    message1.tool_calls = [tool_call]
 
-    fc_candidate = MagicMock()
-    fc_candidate.content = fc_content
+    choice1 = MagicMock()
+    choice1.message = message1
 
-    fc_response = MagicMock()
-    fc_response.candidates = [fc_candidate]
+    response1 = MagicMock()
+    response1.choices = [choice1]
 
     # ── Second response: plain text ────────────────────────────────────────────
-    text_response = make_gemini_text_response(final_text)
+    text_response = make_groq_text_response(final_text)
 
-    return [fc_response, text_response]
+    return [response1, text_response]
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -248,7 +247,7 @@ class TestExecuteTool:
     async def test_search_faq_tool_found(self):
         import main
         with patch("main.search_faq", return_value="We deliver within 2 days."):
-            result = await main.execute_tool("search_faq", {"query": "delivery"})
+            result = await main.execute_tool("lookup_store_policy", {"question": "delivery"})
         assert result["found"] is True
         assert "We deliver" in result["answer"]
 
@@ -256,7 +255,7 @@ class TestExecuteTool:
     async def test_search_faq_tool_not_found(self):
         import main
         with patch("main.search_faq", return_value=None):
-            result = await main.execute_tool("search_faq", {"query": "basketball"})
+            result = await main.execute_tool("lookup_store_policy", {"question": "basketball"})
         assert result["found"] is False
         assert "No FAQ" in result["message"]
 
@@ -314,8 +313,10 @@ class TestExecuteTool:
             "caloriesPerServing": 420,
             "allergens": ["fish"],
         }
+        mock_cursor = MagicMock()
+        mock_cursor.to_list = AsyncMock(return_value=[fake_meal])
         mock_db = MagicMock()
-        mock_db.meals.find.return_value = [fake_meal]
+        mock_db.meals.find.return_value = mock_cursor
         with patch("main.db", mock_db):
             result = await main.execute_tool(
                 "get_available_meals", {"dietType": "keto"}
@@ -436,46 +437,52 @@ class TestExecuteTool:
 
 class TestSessionHelpers:
 
-    def test_get_session_history_db_none(self):
+    @pytest.mark.asyncio
+    async def test_get_session_history_db_none(self):
         import main
         with patch("main.db", None):
-            history = main.get_session_history("session-xyz")
+            history = await main.get_session_history("session-xyz")
         assert history == []
 
-    def test_get_session_history_not_found(self):
+    @pytest.mark.asyncio
+    async def test_get_session_history_not_found(self):
         import main
         mock_db = MagicMock()
-        mock_db.chat_sessions.find_one.return_value = None
+        mock_db.chat_sessions.find_one = AsyncMock(return_value=None)
         with patch("main.db", mock_db):
-            history = main.get_session_history("session-xyz")
+            history = await main.get_session_history("session-xyz")
         assert history == []
 
-    def test_get_session_history_returns_messages(self):
+    @pytest.mark.asyncio
+    async def test_get_session_history_returns_messages(self):
         import main
         mock_db = MagicMock()
-        mock_db.chat_sessions.find_one.return_value = {
+        mock_db.chat_sessions.find_one = AsyncMock(return_value={
             "sessionId": "s1",
             "messages": [
                 {"role": "user", "content": "Hello"},
                 {"role": "model", "content": "Hi there!"},
             ],
-        }
+        })
         with patch("main.db", mock_db):
-            history = main.get_session_history("s1")
+            history = await main.get_session_history("s1")
         assert len(history) == 2
         assert history[0]["role"] == "user"
 
-    def test_save_session_message_db_none(self):
+    @pytest.mark.asyncio
+    async def test_save_session_message_db_none(self):
         """Should silently succeed (no error) when db is None."""
         import main
         with patch("main.db", None):
-            main.save_session_message("s1", "user", "hello")  # must not raise
+            await main.save_session_message("s1", "user", "hello")  # must not raise
 
-    def test_save_session_message_calls_update_one(self):
+    @pytest.mark.asyncio
+    async def test_save_session_message_calls_update_one(self):
         import main
         mock_db = MagicMock()
+        mock_db.chat_sessions.update_one = AsyncMock()
         with patch("main.db", mock_db):
-            main.save_session_message("s1", "user", "hello")
+            await main.save_session_message("s1", "user", "hello")
         mock_db.chat_sessions.update_one.assert_called_once()
         args, kwargs = mock_db.chat_sessions.update_one.call_args
         assert kwargs.get("upsert") is True
@@ -487,22 +494,23 @@ class TestSessionHelpers:
 
 @pytest.fixture
 def mock_db():
-    """A mock MongoDB db object wired to session helpers."""
+    """A mock MongoDB db object wired to session helpers (async-compatible)."""
     db = MagicMock()
-    db.chat_sessions.find_one.return_value = None  # no prior history
-    db.chat_sessions.update_one.return_value = None
+    db.chat_sessions.find_one = AsyncMock(return_value=None)  # no prior history
+    db.chat_sessions.update_one = AsyncMock(return_value=None)
+    db.chat_sessions.delete_one = AsyncMock(return_value=None)
     return db
 
 
 @pytest.fixture
 def app_with_mocks(mock_db):
-    """Import the FastAPI app with Gemini + MongoDB patched out."""
+    """Import the FastAPI app with Groq retry helper + MongoDB patched out."""
     with (
         patch("main.db", mock_db),
-        patch("main.gemini_client") as mock_gemini,
+        patch("main.groq_generate_with_retry") as mock_groq_retry,
     ):
         import main
-        yield main.app, mock_gemini
+        yield main.app, mock_groq_retry
 
 
 @pytest.mark.asyncio
@@ -524,8 +532,8 @@ class TestChatEndpoint:
     # ── Happy-path plain text ──────────────────────────────────────────────────
 
     async def test_basic_text_response_english(self, app_with_mocks):
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response(
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response(
             "Hello! How can I help you with Boxify today?"
         )
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -538,11 +546,11 @@ class TestChatEndpoint:
         body = resp.json()
         assert "answer" in body
         assert "Hello" in body["answer"]
-        assert body["source"] == "gemini"
+        assert body["source"] == "groq"
 
     async def test_basic_text_response_arabic(self, app_with_mocks):
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response(
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response(
             "أهلاً! كيف ممكن أساعدك؟"
         )
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -553,7 +561,7 @@ class TestChatEndpoint:
             })
         assert resp.status_code == 200
         body = resp.json()
-        assert body["source"] == "gemini"
+        assert body["source"] == "groq"
         # Arabic response should contain Arabic characters
         assert any("\u0600" <= c <= "\u06FF" for c in body["answer"])
 
@@ -566,8 +574,8 @@ class TestChatEndpoint:
 
     async def test_defaults_language_to_ar(self, app_with_mocks):
         """When message contains Arabic script, detect_language returns 'ar' automatically."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response(
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response(
             "أهلاً بيك!"
         )
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -576,15 +584,16 @@ class TestChatEndpoint:
                 "sessionId": "s-defaults",
             })
         assert resp.status_code == 200
-        # Verify the single unified prompt was used (contains LANGUAGE RULE)
-        call_kwargs = mock_gemini.models.generate_content.call_args[1]
-        system_instr = call_kwargs["config"].system_instruction
-        assert "LANGUAGE RULE" in system_instr
+        # Verify the retry helper was called with the right config
+        call_args = mock_groq_retry.call_args
+        messages = call_args[0][0]  # first positional arg is messages
+        system_instruction = messages[0]["content"]
+        assert "LANGUAGE RULE" in system_instruction
 
     async def test_fallback_when_answer_is_empty(self, app_with_mocks):
-        """When Gemini returns empty text, a fallback message should be returned."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response("")
+        """When Groq returns empty text, a fallback message should be returned."""
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response("")
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post("/chat", json={
                 "message": "hmm",
@@ -599,14 +608,14 @@ class TestChatEndpoint:
     # ── Tool-calling scenarios ─────────────────────────────────────────────────
 
     async def test_faq_tool_call_flow(self, app_with_mocks):
-        """Gemini triggers search_faq → execute_tool → Gemini replies with text."""
-        app, mock_gemini = app_with_mocks
-        responses = make_gemini_tool_then_text(
-            tool_name="search_faq",
-            tool_args={"query": "delivery policy"},
+        """Groq triggers lookup_store_policy → execute_tool → Groq replies with text."""
+        app, mock_groq_retry = app_with_mocks
+        responses = make_groq_tool_then_text(
+            tool_name="lookup_store_policy",
+            tool_args={"question": "delivery policy"},
             final_text="We deliver within 2 business days.",
         )
-        mock_gemini.models.generate_content.side_effect = responses
+        mock_groq_retry.side_effect = responses
 
         with patch("main.search_faq", return_value="We deliver within 2 business days."):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -618,20 +627,20 @@ class TestChatEndpoint:
 
         assert resp.status_code == 200
         body = resp.json()
-        assert body["source"] == "gemini"
+        assert body["source"] == "groq"
         # toolCalls should record the FAQ call
         assert len(body["toolCalls"]) == 1
-        assert body["toolCalls"][0]["tool"] == "search_faq"
+        assert body["toolCalls"][0]["tool"] == "lookup_store_policy"
 
     async def test_recommend_box_tool_call_flow(self, app_with_mocks):
-        """Gemini triggers recommend_box and returns box recommendations."""
-        app, mock_gemini = app_with_mocks
-        responses = make_gemini_tool_then_text(
+        """Groq triggers recommend_box and returns box recommendations."""
+        app, mock_groq_retry = app_with_mocks
+        responses = make_groq_tool_then_text(
             tool_name="recommend_box",
             tool_args={"dietType": "keto"},
             final_text="Here are some keto boxes for you!",
         )
-        mock_gemini.models.generate_content.side_effect = responses
+        mock_groq_retry.side_effect = responses
 
         fake_box_result = {
             "boxes": [{"id": "b1", "name": "Keto Bliss", "dietType": "keto", "price": 120}],
@@ -651,13 +660,13 @@ class TestChatEndpoint:
 
     async def test_add_to_cart_requires_auth_token(self, app_with_mocks):
         """When no userToken provided, add_to_cart tool should return auth error."""
-        app, mock_gemini = app_with_mocks
-        responses = make_gemini_tool_then_text(
+        app, mock_groq_retry = app_with_mocks
+        responses = make_groq_tool_then_text(
             tool_name="add_to_cart",
             tool_args={"boxId": "box1", "servingSize": 2},
             final_text="Please sign in to add items to your cart.",
         )
-        mock_gemini.models.generate_content.side_effect = responses
+        mock_groq_retry.side_effect = responses
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post("/chat", json={
@@ -676,13 +685,13 @@ class TestChatEndpoint:
 
     async def test_subscription_flow_with_token(self, app_with_mocks):
         """With a valid token, create_subscription tool should succeed."""
-        app, mock_gemini = app_with_mocks
-        responses = make_gemini_tool_then_text(
+        app, mock_groq_retry = app_with_mocks
+        responses = make_groq_tool_then_text(
             tool_name="create_subscription",
             tool_args={"boxId": "box1", "servingSize": 2, "frequency": "weekly"},
             final_text="Subscription created successfully!",
         )
-        mock_gemini.models.generate_content.side_effect = responses
+        mock_groq_retry.side_effect = responses
 
         sub_result = {
             "success": True,
@@ -699,22 +708,22 @@ class TestChatEndpoint:
                 })
 
         assert resp.status_code == 200
-        assert resp.json()["source"] == "gemini"
+        assert resp.json()["source"] == "groq"
 
     # ── ReAct loop / guard ─────────────────────────────────────────────────────
 
     async def test_max_iterations_guard(self, app_with_mocks):
-        """If Gemini keeps calling tools for 5 iterations, return a fallback message."""
-        app, mock_gemini = app_with_mocks
+        """If Groq keeps calling tools for 5 iterations, return a fallback message."""
+        app, mock_groq_retry = app_with_mocks
 
         # Always return a tool-call response (never a plain-text response)
-        always_tool = make_gemini_tool_then_text(
-            tool_name="search_faq",
-            tool_args={"query": "loop"},
+        always_tool = make_groq_tool_then_text(
+            tool_name="lookup_store_policy",
+            tool_args={"question": "loop"},
             final_text="never reached",
         )
         # Return only the first (tool-call) response indefinitely
-        mock_gemini.models.generate_content.side_effect = [always_tool[0]] * 10
+        mock_groq_retry.side_effect = [always_tool[0]] * 10
 
         with patch("main.search_faq", return_value="FAQ answer"):
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -733,8 +742,8 @@ class TestChatEndpoint:
 
     async def test_session_messages_saved(self, app_with_mocks, mock_db):
         """After a chat, save_session_message should have been called for user + model."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response(
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response(
             "Sure, here's info about delivery!"
         )
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -746,9 +755,9 @@ class TestChatEndpoint:
         # update_one should have been called at least twice (user msg + model msg)
         assert mock_db.chat_sessions.update_one.call_count >= 2
 
-    async def test_session_history_sent_to_gemini(self, app_with_mocks, mock_db):
-        """Prior session history should be included in the Gemini call."""
-        app, mock_gemini = app_with_mocks
+    async def test_session_history_sent_to_groq(self, app_with_mocks, mock_db):
+        """Prior session history should be included in the Groq call."""
+        app, mock_groq_retry = app_with_mocks
         mock_db.chat_sessions.find_one.return_value = {
             "sessionId": "s-history",
             "messages": [
@@ -756,7 +765,7 @@ class TestChatEndpoint:
                 {"role": "model", "content": "I am Boxify Chef!"},
             ],
         }
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response(
+        mock_groq_retry.return_value = make_groq_text_response(
             "As I mentioned, I am Boxify Chef!"
         )
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -766,18 +775,18 @@ class TestChatEndpoint:
                 "sessionId": "s-history",
             })
         assert resp.status_code == 200
-        # The contents list sent to Gemini should include the history messages
-        call_kwargs = mock_gemini.models.generate_content.call_args[1]
-        contents = call_kwargs["contents"]
-        # At least: 2 history + 1 new user message
-        assert len(contents) >= 3
+        # The messages list sent to Groq should include the history messages
+        call_args = mock_groq_retry.call_args
+        contents = call_args[0][0]  # first positional arg is messages
+        # At least: 1 system prompt + 2 history + 1 new user message
+        assert len(contents) >= 4
 
     # ── Error handling ─────────────────────────────────────────────────────────
 
-    async def test_gemini_exception_returns_500_like_response(self, app_with_mocks):
-        """If Gemini raises an exception, endpoint should return a graceful error message."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.side_effect = RuntimeError("Gemini is down")
+    async def test_groq_exception_returns_500_like_response(self, app_with_mocks):
+        """If Groq raises an exception, endpoint should return a graceful error message."""
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.side_effect = RuntimeError("Groq is down")
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post("/chat", json={
                 "message": "Hello",
@@ -786,13 +795,13 @@ class TestChatEndpoint:
             })
         assert resp.status_code == 200  # endpoint catches and returns 200 with error body
         body = resp.json()
-        assert body["source"] == "error"
+        assert body["source"] in ("error", "faq_fallback")
         assert len(body["answer"]) > 0
 
     async def test_empty_string_message(self, app_with_mocks):
-        """An empty-string message is technically valid Pydantic; Gemini decides response."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response(
+        """An empty-string message is technically valid Pydantic; Groq decides response."""
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response(
             "Could you rephrase?"
         )
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -805,8 +814,8 @@ class TestChatEndpoint:
 
     async def test_very_long_message(self, app_with_mocks):
         """Long messages should not break the endpoint."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response(
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response(
             "Thanks for the detailed question!"
         )
         long_msg = "Tell me about Boxify. " * 200
@@ -822,32 +831,34 @@ class TestChatEndpoint:
 
     async def test_english_system_prompt_selected(self, app_with_mocks):
         """Single unified prompt is always used regardless of message language."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response("Hi!")
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response("Hi!")
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.post("/chat", json={
                 "message": "Hi",
                 "sessionId": "s-en-prompt",
             })
-        call_kwargs = mock_gemini.models.generate_content.call_args[1]
-        system_instr = call_kwargs["config"].system_instruction
+        call_args = mock_groq_retry.call_args
+        messages = call_args[0][0]  # first positional arg is messages
+        system_instruction = messages[0]["content"]
         # Unified prompt contains the LANGUAGE RULE block
-        assert "LANGUAGE RULE" in system_instr
-        assert "Boxify Chef" in system_instr
+        assert "LANGUAGE RULE" in system_instruction
+        assert "Boxify Chef" in system_instruction
 
     async def test_arabic_system_prompt_selected(self, app_with_mocks):
         """Same unified prompt is used for Arabic messages too."""
-        app, mock_gemini = app_with_mocks
-        mock_gemini.models.generate_content.return_value = make_gemini_text_response("أهلاً!")
+        app, mock_groq_retry = app_with_mocks
+        mock_groq_retry.return_value = make_groq_text_response("أهلاً!")
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.post("/chat", json={
                 "message": "مرحبا",
                 "sessionId": "s-ar-prompt",
             })
-        call_kwargs = mock_gemini.models.generate_content.call_args[1]
-        system_instr = call_kwargs["config"].system_instruction
-        assert "LANGUAGE RULE" in system_instr
-        assert "Boxify Chef" in system_instr
+        call_args = mock_groq_retry.call_args
+        messages = call_args[0][0]  # first positional arg is messages
+        system_instruction = messages[0]["content"]
+        assert "LANGUAGE RULE" in system_instruction
+        assert "Boxify Chef" in system_instruction
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

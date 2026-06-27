@@ -29,8 +29,19 @@ const subscriptionSchema = new mongoose.Schema(
     },
     deliveryDay: {
       type: String,
-      enum: ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday'],
+      enum: ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
       default: 'saturday',
+    },
+    // Where the recurring deliveries should be sent (snapshot at subscription time)
+    deliveryAddress: {
+      street: String,
+      city: String,
+      country: String,
+      postalCode: String,
+    },
+    phone: {
+      type: String,
+      default: null,
     },
     nextDeliveryDate: {
       type: Date,

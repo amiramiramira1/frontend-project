@@ -57,17 +57,17 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('register.nameLabel')}</label>
-              <input type="text" required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input-field" placeholder={t('register.namePlaceholder')} />
+              <label htmlFor="reg-name" className="block text-sm font-medium text-gray-700 mb-1.5">{t('register.nameLabel')}</label>
+              <input id="reg-name" type="text" required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="input-field" placeholder={t('register.namePlaceholder')} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('register.emailLabel')}</label>
-              <input type="email" required value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="input-field" placeholder="you@example.com" />
+              <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700 mb-1.5">{t('register.emailLabel')}</label>
+              <input id="reg-email" type="email" required value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="input-field" placeholder="you@example.com" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('register.passwordLabel')}</label>
+              <label htmlFor="reg-password" className="block text-sm font-medium text-gray-700 mb-1.5">{t('register.passwordLabel')}</label>
               <div className="relative">
-                <input type="text" style={{ WebkitTextSecurity: showPw ? 'none' : 'disc' }} required value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="input-field pr-12" placeholder={t('register.pwPlaceholder')} />
+                <input id="reg-password" type="text" style={{ WebkitTextSecurity: showPw ? 'none' : 'disc' }} required value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="input-field pr-12" placeholder={t('register.pwPlaceholder')} />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>

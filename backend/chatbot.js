@@ -32,8 +32,12 @@ async function callAIService(endpoint, body, method = 'POST') {
 // @access  Public (but personalized features require auth)
 router.post('/chat', async (req, res) => {
   try {
-    const { message, sessionId } = req.body;
-    if (!message) return res.status(400).json({ error: 'Message is required' });
+    const { message, sessionId, flow, action } = req.body;
+    // Structured flow actions (e.g. selecting a meal) may carry an empty message,
+    // so only require a message when no explicit flow/action is present.
+    if (!message && !flow && !action) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
 
     // Extract user token from the Authorization header and forward it to the AI service
     let userToken = null;
@@ -41,11 +45,14 @@ router.post('/chat', async (req, res) => {
       userToken = req.headers.authorization.split(' ')[1];
     }
 
-    // Language is auto-detected by the AI service from the message text
+    // Language is auto-detected by the AI service from the message text.
+    // `flow` and `action` drive the deterministic button-driven flows.
     const data = await callAIService('/chat', {
-      message,
+      message: message || '',
       session_id: sessionId || 'default',
       user_token: userToken,
+      flow: flow || null,
+      action: action || null,
     });
 
     return res.json(data);

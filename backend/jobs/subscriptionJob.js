@@ -73,7 +73,7 @@ const processSubscriptions = async () => {
       const multiplier = SERVING_MULTIPLIERS[subscription.servingSize] || 1;
       const priceAtPurchase = parseFloat((box.basePrice * multiplier).toFixed(2));
 
-      // Create the delivery order
+      // Create the delivery order — carry the subscription's delivery details
       const order = await Order.create({
         user: subscription.user,
         items: [
@@ -88,6 +88,9 @@ const processSubscriptions = async () => {
         orderType: 'subscription',
         subscription: subscription._id,
         status: 'confirmed',
+        deliveryAddress: subscription.deliveryAddress,
+        phone: subscription.phone,
+        deliveryDate: subscription.nextDeliveryDate,
       });
 
       // Decrement ingredient stocks proportionally
