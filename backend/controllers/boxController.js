@@ -68,10 +68,13 @@ const localizeBox = (box, lang) => {
   return b;
 };
 
-// Helper: calculate box base price from its meals
+// Helper: calculate box base price from its meals.
+// `mealIds` may contain repeated IDs (quantity per meal), so we price by
+// occurrence rather than by distinct meal.
 const calculateBoxPrice = async (mealIds) => {
-  const meals = await Meal.find({ _id: { $in: mealIds } });
-  const total = meals.reduce((sum, meal) => sum + meal.pricePerServing, 0);
+  const found = await Meal.find({ _id: { $in: mealIds } });
+  const priceById = new Map(found.map((m) => [m._id.toString(), m.pricePerServing]));
+  const total = mealIds.reduce((sum, id) => sum + (priceById.get(id.toString()) || 0), 0);
   return parseFloat(total.toFixed(2));
 };
 
@@ -249,16 +252,22 @@ const calculateCustomBox = async (req, res) => {
     const SERVING_MULTIPLIERS = { 1: 1, 2: 1.8, 4: 3.2, 6: 4.5 };
     const multiplier = SERVING_MULTIPLIERS[servingSize] || 1;
 
-    // Calculate totals across all meals
+    // Calculate totals across all meals. `mealIds` may repeat an ID to represent
+    // quantity, so price and calories are summed by occurrence; allergens are a set.
     let totalBasePrice = 0;
     let totalCalories = 0;
     const allergenSet = new Set(); // Use a Set to automatically avoid duplicates
 
-    for (const meal of meals) {
+    const mealById = new Map(meals.map((m) => [m._id.toString(), m]));
+    for (const id of mealIds) {
+      const meal = mealById.get(id.toString());
+      if (!meal) continue;
       totalBasePrice += meal.pricePerServing;
       totalCalories += meal.caloriesPerServing;
+    }
 
-      // Collect all allergens from all meals
+    for (const meal of meals) {
+      // Collect all allergens from all (distinct) meals
       meal.allergens.forEach((allergen) => allergenSet.add(allergen));
     }
 
@@ -272,7 +281,7 @@ const calculateCustomBox = async (req, res) => {
         priceForServingSize,
         totalCalories: Math.round(totalCalories * multiplier),
         allergens: [...allergenSet], // Convert Set back to array
-        mealCount: meals.length,
+        mealCount: mealIds.length,
       },
     });
   } catch (error) {

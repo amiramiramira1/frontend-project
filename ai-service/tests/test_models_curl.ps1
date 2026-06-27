@@ -1,11 +1,9 @@
-# PowerShell script to test different Gemini models against the Boxify AI Service
+# PowerShell script to test different Groq models against the Boxify AI Service
 # Assumes the AI service is running on http://localhost:8000
 
 $models = @(
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.0-flash"
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant"
 )
 
 Write-Host "=========================================================" -ForegroundColor Cyan

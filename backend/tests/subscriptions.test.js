@@ -23,6 +23,12 @@ afterAll(async () => {
 
 // ─── POST /api/subscriptions ──────────────────────────────────────────────────
 describe('POST /api/subscriptions', () => {
+  const deliveryDetails = {
+    deliveryDay: 'monday',
+    deliveryAddress: { street: '12 Tahrir St', city: 'Cairo', country: 'Egypt' },
+    phone: '+201000000000',
+  };
+
   it('should create a new subscription for the customer', async () => {
     const res = await request(app)
       .post('/api/subscriptions')
@@ -31,20 +37,31 @@ describe('POST /api/subscriptions', () => {
         boxId: state.boxId,
         servingSize: 2,
         frequency: 'weekly',
+        ...deliveryDetails,
       });
     expect(res.statusCode).toBe(201);
     expect(res.body.subscription).toHaveProperty('_id');
     expect(res.body.subscription.status).toBe('active');
     expect(res.body.subscription).toHaveProperty('nextDeliveryDate');
+    expect(res.body.subscription.deliveryAddress.city).toBe('Cairo');
+    expect(res.body.subscription.deliveryDay).toBe('monday');
     subId = res.body.subscription._id;
     state.subId = subId;
+  });
+
+  it('should reject a subscription with no delivery address', async () => {
+    const res = await request(app)
+      .post('/api/subscriptions')
+      .set('Authorization', `Bearer ${state.customerToken}`)
+      .send({ boxId: state.boxId, servingSize: 2, frequency: 'weekly', deliveryDay: 'monday' });
+    expect(res.statusCode).toBe(400);
   });
 
   it('should reject duplicate subscription for the same box', async () => {
     const res = await request(app)
       .post('/api/subscriptions')
       .set('Authorization', `Bearer ${state.customerToken}`)
-      .send({ boxId: state.boxId, servingSize: 2, frequency: 'weekly' });
+      .send({ boxId: state.boxId, servingSize: 2, frequency: 'weekly', ...deliveryDetails });
     expect(res.statusCode).toBe(400);
     expect(res.body.message).toMatch(/already have an active subscription/i);
   });
@@ -53,14 +70,14 @@ describe('POST /api/subscriptions', () => {
     const res = await request(app)
       .post('/api/subscriptions')
       .set('Authorization', `Bearer ${state.customerToken}`)
-      .send({ boxId: '000000000000000000000000', servingSize: 2, frequency: 'weekly' });
+      .send({ boxId: '000000000000000000000000', servingSize: 2, frequency: 'weekly', ...deliveryDetails });
     expect(res.statusCode).toBe(404);
   });
 
   it('should require authentication', async () => {
     const res = await request(app)
       .post('/api/subscriptions')
-      .send({ boxId: state.boxId, servingSize: 2, frequency: 'weekly' });
+      .send({ boxId: state.boxId, servingSize: 2, frequency: 'weekly', ...deliveryDetails });
     expect(res.statusCode).toBe(401);
   });
 });

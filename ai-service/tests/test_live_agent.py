@@ -34,15 +34,13 @@ if AI_SERVICE_DIR not in sys.path:
 
 load_dotenv(os.path.join(AI_SERVICE_DIR, ".env"))
 
-# Model used by live tests — has its own separate daily quota pool.
+# Model used by live tests.
 # Override with LIVE_TEST_MODEL env var if you want a different model.
-# Defaults to gemini-2.5-flash-lite to avoid exhausting the production
-# model's (gemini-2.5-flash) free-tier 20 RPD daily quota.
-LIVE_TEST_MODEL = os.getenv("LIVE_TEST_MODEL", "gemini-flash-latest")
+LIVE_TEST_MODEL = os.getenv("LIVE_TEST_MODEL", "llama-3.3-70b-versatile")
 
 pytestmark = pytest.mark.skipif(
-    not os.getenv("GEMINI_API_KEY"),
-    reason="GEMINI_API_KEY environment variable not set",
+    not os.getenv("GROQ_API_KEY"),
+    reason="GROQ_API_KEY environment variable not set",
 )
 
 
@@ -63,26 +61,17 @@ def _tool_args(data: dict, tool_name: str) -> dict:
 
 def _check_quota(data: dict) -> None:
     """
-    Skip the test gracefully if the Gemini API daily quota is exhausted.
+    Skip the test gracefully if the Groq API daily quota is exhausted or rate limited.
 
-    When the free-tier daily limit (20 RPD) is hit, the chat endpoint
-    returns source='faq_fallback' or source='error' with no toolCalls.
-    Detect that and call pytest.skip() so the run shows SKIPPED instead
-    of FAILED — quota exhaustion is an infrastructure constraint, not a
-    code bug.  Per-minute (429 RPM) transient limits are NOT skipped;
-    they should be retried tomorrow or after the minute window resets.
+    When the limits are hit, the chat endpoint returns source='faq_fallback' or source='error'
+    with no toolCalls. Detect that and call pytest.skip().
     """
     answer = data.get("answer", "")
     source  = data.get("source", "")
-    # The retry helper logs the quota error to stdout; we detect it via
-    # the response shape: no tool calls + faq_fallback / error source.
     if source in ("faq_fallback", "error") and not data.get("toolCalls"):
-        # Only skip for *daily* quota exhaustion, not per-minute limits.
-        # Daily limits mention "limit: 20" in the server logs; we use the
-        # generic heuristic: if Gemini never got to run, skip.
         pytest.skip(
-            f"Gemini daily quota exhausted for model "
-            f"'{data.get('model', LIVE_TEST_MODEL)}' — re-run tomorrow. "
+            f"Groq API limit hit or error for model "
+            f"'{data.get('model', LIVE_TEST_MODEL)}'. "
             f"answer={answer!r:.80}"
         )
 
@@ -158,32 +147,28 @@ def mock_backend():
 class TestLiveAgentFunctions:
 
     @pytest.fixture(autouse=True)
-    def fresh_gemini_client(self):
+    def fresh_groq_client(self):
         """
         Before every test:
-          1. Recreate genai.Client so its internal httpx pool is bound to
-             the current event loop (pytest-asyncio creates a new loop per
-             test — the old pool would raise 'Event loop is closed').
-          2. Override MODEL_ID with LIVE_TEST_MODEL so the tests use their
-             own separate daily quota and don't exhaust the production
-             model's free-tier limit (20 RPD for gemini-2.5-flash).
+          1. Recreate AsyncGroq client to bind its HTTP pool to the current event loop.
+          2. Override MODEL_ID with LIVE_TEST_MODEL.
         """
-        from google import genai as _genai
-        new_client = _genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        with patch("main.gemini_client", new_client), \
+        from groq import AsyncGroq
+        new_client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+        with patch("main.groq_client", new_client), \
              patch("main.MODEL_ID", LIVE_TEST_MODEL):
             yield
 
     @pytest.fixture(autouse=True)
     async def _rate_guard(self):
-        """Sleep 5 s BEFORE each test to stay under free-tier rate limits."""
-        await asyncio.sleep(5)
+        """Sleep 1 s BEFORE each test to stay under free-tier rate limits."""
+        await asyncio.sleep(1)
         yield
 
     # ── 1. FAQ ────────────────────────────────────────────────────────────────
 
     async def test_live_faq_search(self, mock_db):
-        """Agent must call search_faq when asked a policy question."""
+        """Agent must call get_faq_answer when asked a policy question."""
         import main
 
         faq_data = [{
@@ -205,9 +190,9 @@ class TestLiveAgentFunctions:
         assert resp.status_code == 200
         data = resp.json()
         _check_quota(data)
-        assert data["source"] == "gemini"
-        assert _tool_was_called(data, "search_faq"), \
-            f"Expected search_faq tool call. toolCalls={data.get('toolCalls')}"
+        assert data["source"] == "groq"
+        assert _tool_was_called(data, "lookup_store_policy"), \
+            f"Expected lookup_store_policy tool call. toolCalls={data.get('toolCalls')}"
         answer = data["answer"]
         assert "48" in answer or "deliver" in answer.lower() or _has_arabic(answer)
 

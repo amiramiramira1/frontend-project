@@ -87,16 +87,11 @@ exports.updateBoxValidator = [
 
 // --- Create Custom Box (Customer) ---
 exports.createCustomBoxValidator = [
+  // Note: duplicate meals are allowed — repeating a meal ID represents picking
+  // multiple servings of that meal (quantity). Up to 10 entries total.
   body('meals')
     .notEmpty().withMessage('Please select at least one meal')
-    .isArray({ min: 1, max: 10 }).withMessage('A custom box can have between 1 and 10 meals')
-    .custom((meals) => {
-      const uniqueMeals = new Set(meals);
-      if (uniqueMeals.size !== meals.length) {
-        throw new Error('A box cannot contain duplicate meals');
-      }
-      return true;
-    }),
+    .isArray({ min: 1, max: 10 }).withMessage('A custom box can have between 1 and 10 meals'),
 
   body('meals.*')
     .isMongoId().withMessage('Each meal must be a valid MongoDB ID'),
@@ -114,16 +109,10 @@ exports.createCustomBoxValidator = [
 
 // --- Calculate Custom Box Preview ---
 exports.calculateCustomBoxValidator = [
+  // Duplicate meal IDs are allowed (they represent quantity per meal).
   body('mealIds')
     .notEmpty().withMessage('Please provide meal IDs')
-    .isArray({ min: 1, max: 10 }).withMessage('Please select between 1 and 10 meals')
-    .custom((mealIds) => {
-      const unique = new Set(mealIds);
-      if (unique.size !== mealIds.length) {
-        throw new Error('Duplicate meal IDs are not allowed');
-      }
-      return true;
-    }),
+    .isArray({ min: 1, max: 10 }).withMessage('Please select between 1 and 10 meals'),
 
   body('mealIds.*')
     .isMongoId().withMessage('Each meal ID must be a valid MongoDB ID'),

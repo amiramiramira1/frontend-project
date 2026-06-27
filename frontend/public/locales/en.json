@@ -382,7 +382,7 @@
     "monthly":    "Monthly",
     "monthlyDesc":"Every month",
     "dayLabel":   "Preferred Delivery Day",
-    "sat":"Sat","sun":"Sun","mon":"Mon","tue":"Tue","wed":"Wed","thu":"Thu",
+    "sat":"Sat","sun":"Sun","mon":"Mon","tue":"Tue","wed":"Wed","thu":"Thu","fri":"Fri",
     "perk1":      "Lock in today's price forever",
     "perk2":      "Pause or cancel anytime",
     "perk3":      "Fresh delivery every week",
