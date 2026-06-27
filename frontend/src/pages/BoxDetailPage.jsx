@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useFavorites } from '../context/FavoritesContext';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Users, Clock, Flame, ShoppingCart, Repeat, Star, ChefHat, AlertCircle, PenLine, X, CheckCircle, ArrowUpDown } from 'lucide-react';
+import { ChevronLeft, Users, Clock, Flame, ShoppingCart, Repeat, Star, ChefHat, AlertCircle, PenLine, X, CheckCircle, ArrowUpDown, Trash2, Heart } from 'lucide-react';
 import StarRating from '../components/StarRating';
 
 // Backend serving size multipliers (same as backend constants)
@@ -35,6 +36,7 @@ export default function BoxDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const { t, i18n } = useTranslation();
 
   const servingOptions = [
@@ -106,9 +108,9 @@ export default function BoxDetailPage() {
     setAdding(true);
     try {
       await addToCart({ type: 'pre-made-box', boxId: box._id, servingsPerMeal: servings });
-      toast.success(t('boxDetails.addedToCart', 'Added to cart!'));
+      toast.success(t('msg.addedToCart', 'Added to cart!'));
     } catch (err) {
-      toast.error(err.response?.data?.message || t('boxDetails.failedToAddToCart', 'Failed to add to cart'));
+      toast.error(err.response?.data?.message || t('msg.failedToAddToCart', 'Failed to add to cart'));
     } finally {
       setAdding(false);
     }
@@ -136,6 +138,12 @@ export default function BoxDetailPage() {
     toast.success(t('boxDetails.reviewSubmitted', 'Review submitted! 🎉'));
   };
 
+  const handleDeleteReview = (reviewId) => {
+      setReviews(prev => prev.filter(r => r._id !== reviewId));
+      toast.success(t('boxDetails.reviewDeleted', 'Review deleted'));
+    };
+
+
   const ratingLabels = {
     1: t('boxDetails.ratingPoor', 'Poor'),
     2: t('boxDetails.ratingFair', 'Fair'),
@@ -144,6 +152,8 @@ export default function BoxDetailPage() {
     5: t('boxDetails.ratingExcellent', 'Excellent')
   };
   const charLimit = 500;
+
+  const favorited = isFavorite(box?._id);
 
   if (loading) {
     return (
@@ -171,6 +181,15 @@ export default function BoxDetailPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
         <button onClick={() => navigate('/boxes')} className="absolute top-6 left-6 bg-white/90 backdrop-blur-sm text-gray-800 font-medium px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-white transition-colors text-sm">
           <ChevronLeft className="w-4 h-4" /> {t('boxDetails.back', 'Back')}
+        </button>
+        <button
+          onClick={() => {
+            if (!user) { navigate('/login'); return; }
+            toggleFavorite(box._id);
+          }}
+          className="absolute top-6 right-6 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+        >
+          <Heart className={`w-5 h-5 transition-colors ${favorited ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
         </button>
         <div className="absolute bottom-6 left-6 right-6">
           <div className="flex items-center gap-2 mb-2">
@@ -368,7 +387,18 @@ export default function BoxDetailPage() {
                               <div className="text-xs text-gray-400 mt-0.5">{review.date}</div>
                             </div>
                           </div>
-                          <StarRating rating={review.rating} size="md" />
+                          <div className="flex items-center gap-2">
+                            <StarRating rating={review.rating} size="md" />
+                            {review.name === user?.name && (
+                              <button
+                                onClick={() => handleDeleteReview(review._id)}
+                                className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title={t('boxDetails.deleteReview', 'Delete review')}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <p className="text-sm text-gray-600 leading-relaxed">{review.comment}</p>
                       </div>

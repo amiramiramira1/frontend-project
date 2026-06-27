@@ -27,7 +27,7 @@ export default function ProfilePage() {
   const [addresses, setAddresses] = useState(user?.addresses || []);
   const [allergens, setAllergens] = useState(user?.allergens || []);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newAddr, setNewAddr] = useState({ label: 'Home', street: '', city: 'Cairo', zip: '', phone: '', isDefault: false });
+  const [newAddr, setNewAddr] = useState({ label: 'Home', street: '', city: 'Cairo', postalCode: '', phone: '', isDefault: false });
   const [showDelete, setShowDelete] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
@@ -52,8 +52,8 @@ export default function ProfilePage() {
 
   const addAddress = () => {
     if (!newAddr.street || !newAddr.phone) { toast.error(i18next.t('msg.addressRequired')); return; }
-    setAddresses((prev) => [...prev, { ...newAddr, _id: Date.now().toString() }]);
-    setNewAddr({ label: 'Home', street: '', city: 'Cairo', zip: '', phone: '', isDefault: false });
+    setAddresses((prev) => [...prev, { ...newAddr }]);
+    setNewAddr({ label: 'Home', street: '', city: 'Cairo', postalCode: '', phone: '', isDefault: false });
     setShowAddForm(false);
     toast.success(i18next.t('msg.addressAdded'));
   };
@@ -95,6 +95,7 @@ export default function ProfilePage() {
             <input placeholder={t('profile.labelPh')} value={newAddr.label} onChange={(e) => setNewAddr((p) => ({ ...p, label: e.target.value }))} className="input-field" />
             <input placeholder={t('profile.streetPh')} value={newAddr.street} onChange={(e) => setNewAddr((p) => ({ ...p, street: e.target.value }))} className="input-field" />
             <input placeholder={t('profile.cityPh')} value={newAddr.city} onChange={(e) => setNewAddr((p) => ({ ...p, city: e.target.value }))} className="input-field" />
+            <input placeholder={t('profile.postalCodePh')} value={newAddr.postalCode} onChange={(e) => setNewAddr((p) => ({ ...p, postalCode: e.target.value }))} className="input-field" />
             <input placeholder={t('profile.phonePh')} value={newAddr.phone} onChange={(e) => setNewAddr((p) => ({ ...p, phone: e.target.value }))} className="input-field" />
             <button onClick={addAddress} className="btn-primary text-sm">{t('profile.addAddress')}</button>
           </div>

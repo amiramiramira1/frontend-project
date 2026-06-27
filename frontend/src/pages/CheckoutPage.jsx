@@ -7,11 +7,15 @@ import toast from 'react-hot-toast';
 import { MapPin, Phone, Truck, CreditCard, Package } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { registerLocale } from 'react-datepicker';
+import { ar } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 
+registerLocale('ar', ar);
+
 export default function CheckoutPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { cart, fetchCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -29,6 +33,20 @@ export default function CheckoutPage() {
 
   const cities = ['Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Zagazig', 'Ismailia', 'Suez'];
   const timeSlots = ['9AM–12PM', '12PM–3PM', '3PM–6PM', '6PM–9PM'];
+
+  const savedAddresses = user?.addresses || [];
+  const [saveAddress, setSaveAddress] = useState(false);
+
+  const fillFromAddress = (addr) => {
+    setForm(p => ({
+      ...p,
+      street: addr.street || '',
+      city:   addr.city   || 'Cairo',
+      zip:    addr.postalCode || '',
+      phone:  addr.phone  || '',
+    }));
+    setErrors({ street: '', zip: '', phone: '', timeSlot: '', deliveryDate: '' });
+  };
 
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null);
@@ -86,6 +104,25 @@ export default function CheckoutPage() {
       });
 
       await fetchCart();
+      if (saveAddress && form.street && form.phone) {
+        try {
+          const newAddr = {
+            label: 'Home',
+            street: form.street,
+            city: form.city,
+            postalCode: form.zip,
+            phone: form.phone,
+            isDefault: false,
+          };
+          await api.put('/auth/profile', {
+            name: user.name,
+            allergens: user.allergens || [],
+            addresses: [...(user.addresses || []), newAddr],
+          });
+        } catch {
+          // saving address is optional, don't block the order flow
+        }
+      }
       orderPlaced.current = true;
       navigate('/order-confirmation', {
         state: {
@@ -127,6 +164,28 @@ export default function CheckoutPage() {
                 <h2 className="font-display text-xl font-bold mb-5 flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-brand-500" /> {t('checkout.addrTitle')}
                 </h2>
+                {savedAddresses.length > 0 && (
+                  <div className="mb-5">
+                    <p className="text-sm font-medium text-gray-700 mb-2">{t('checkout.savedAddresses', 'Saved Addresses')}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {savedAddresses.map((addr, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => fillFromAddress(addr)}
+                          className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all
+                            ${form.street === addr.street
+                              ? 'border-brand-500 bg-brand-50 text-brand-700'
+                              : 'border-gray-200 hover:border-brand-300 text-gray-600'
+                            }`}
+                        >
+                          <MapPin className="w-3.5 h-3.5 inline-block mr-1.5" />
+                          {addr.label || t('checkout.savedAddr', 'Address')} — {addr.city}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('checkout.streetLabel')}</label>
@@ -152,6 +211,18 @@ export default function CheckoutPage() {
                     </div>
                     {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                   </div>
+                  <div className="md:col-span-2 flex items-center gap-2 mt-1">
+                    <input
+                      type="checkbox"
+                      id="saveAddress"
+                      checked={saveAddress}
+                      onChange={e => setSaveAddress(e.target.checked)}
+                      className="w-4 h-4 accent-brand-500 cursor-pointer"
+                    />
+                    <label htmlFor="saveAddress" className="text-sm text-gray-600 cursor-pointer">
+                      {t('checkout.saveAddress', 'Save this address to my profile')}
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -170,6 +241,7 @@ export default function CheckoutPage() {
                     dateFormat="dd MMMM, yyyy"
                     placeholderText={t('checkout.datePh')}
                     className="input-field w-full"
+                    locale={i18n.language}
                   />
                   {errors.deliveryDate && <p className="text-red-500 text-xs mt-1">{errors.deliveryDate}</p>}
                   <p className="text-xs text-gray-400 mt-1">{t('checkout.dateNote')}</p>

@@ -10,6 +10,7 @@ import { HOME_STATS } from '../constants/homeStats';
 export default function HomePage() {
   const { user } = useAuth();
   const { t, i18n } = useTranslation();
+  const isAr = i18n.language?.startsWith('ar');
   const [featuredBoxes, setFeaturedBoxes] = useState([]);
   const [recommendedBoxes, setRecommendedBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -104,8 +105,8 @@ export default function HomePage() {
                 <span className="text-xl">🥕</span>
               </div>
               <div>
-                <h2 className="font-display font-bold text-xl text-gray-900">Recommended for You</h2>
-                <p className="text-sm text-gray-500">Based on your preferences and order history</p>
+                <h2 className="font-display font-bold text-xl text-gray-900">{t('home.recommendedTitle')}</h2>
+                <p className="text-sm text-gray-500">{t('home.recommendedDesc')}</p>
               </div>
             </div>
             {loadingRecommended ? (
@@ -190,7 +191,7 @@ export default function HomePage() {
             {steps.map((step, idx) => (
               <div key={step.num} className="relative text-center">
                 {idx < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-8 left-1/2 w-full h-0.5 bg-gradient-to-r from-brand-300 to-brand-100" />
+                  <div className={`hidden md:block absolute top-8 ${isAr ? 'right-1/2' : 'left-1/2'} w-full h-0.5 bg-gradient-to-r from-brand-300 to-brand-100"`} />
                 )}
                 <div className="relative z-10 w-16 h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                   <span className="font-display text-white font-black text-lg">{step.num}</span>
