@@ -166,7 +166,7 @@ export default function BoxesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBoxes.map(box => (
                 <div key={box._id} className="relative">
-                  <label className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm cursor-pointer select-none">
+                  <label className="absolute top-3 left-14 z-10 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={compareIds.includes(box._id)}
