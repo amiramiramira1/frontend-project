@@ -156,7 +156,8 @@
   "monday":      "الاثنين",
   "tuesday":     "الثلاثاء",
   "wednesday":   "الأربعاء",
-  "thursday":    "الخميس"
+  "thursday":    "الخميس",
+  "friday":      "الجمعة"
 },
 
   "msg": {

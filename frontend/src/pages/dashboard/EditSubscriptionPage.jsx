@@ -24,6 +24,7 @@ export default function EditSubscriptionPage() {
         { value: 'tuesday',   label: t('editSub.tuesday',   'Tuesday') },
         { value: 'wednesday', label: t('editSub.wednesday', 'Wednesday') },
         { value: 'thursday',  label: t('editSub.thursday',  'Thursday') },
+        { value: 'friday',    label: t('editSub.friday',    'Friday') },
         ];
     const servingOptions = [1, 2, 4, 6];
 
